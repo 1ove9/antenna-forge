@@ -1,0 +1,175 @@
+Source Sequence Antenna Forge (YAF) — Third-Party Notices and License Boundary
+=====================================================================
+
+The YAF source code in this repository is distributed under the MIT
+License (see LICENSE). However, several third-party packages that YAF
+*optionally* loads at runtime carry their own — sometimes
+copyleft — licenses. The boundary between YAF's MIT licensing and these
+third-party licenses is the subject of this notice.
+
+This document is provided in good faith for transparency. It is **not
+legal advice.** If you intend to redistribute YAF together with any of
+the dependencies listed below, or to deploy YAF in a setting where
+license terms are commercially material, please consult qualified
+counsel.
+
+---------------------------------------------------------------------
+1. The necpp / nec2++ dependency (GPL-2.0)
+---------------------------------------------------------------------
+
+`yaf_solvers/nec2_adapter/adapter.py` calls the `necpp` Python module
+(`pip install necpp`), which is a SWIG-generated binding wrapping the
+nec2++ C++ library by Tim Molteno. nec2++ is licensed under the **GNU
+General Public License, version 2** (see the `COPYING` file shipped
+with the upstream necpp source). The original NEC-2 Fortran code from
+which nec2++ descends was released by Lawrence Livermore National
+Laboratory in the 1980s; nec2++ is its GPL-2 port and Python-binding
+descendant.
+
+When the YAF Python process imports `necpp`, the necpp shared library
+is loaded into the same address space as YAF's MIT-licensed Python
+code. The Free Software Foundation's stated interpretation of the GPL
+is that linking GPL code into another program (even via a language
+binding) generally creates a *combined work* that must, *as a
+combination*, be distributed under GPL-2-compatible terms. The MIT
+License is GPL-compatible upstream — MIT-licensed source can be
+incorporated into a GPL combined work — but this does not relicense
+the MIT source itself; it means the *combination as distributed* would
+need to comply with the GPL.
+
+### What this means in practice
+
+A) **Source-only distribution of YAF (this repository as published).**
+   This repository ships *no* necpp source code and *no* compiled
+   necpp binary. YAF declares necpp neither as a hard dependency in
+   `pyproject.toml` nor as a transitive dependency anywhere in the
+   build system. A user who clones this repository receives only the
+   MIT-licensed YAF source. If that user then runs `pip install necpp`
+   on their own machine, the combination on their local machine is
+   their own act of combination; it does not bind upstream YAF.
+
+B) **Running YAF locally with necpp installed.** A single end-user who
+   installs necpp on their own machine and uses the combined system
+   privately is, in most jurisdictions, exercising freedoms the GPL
+   explicitly grants ("you may run the program for any purpose"). No
+   redistribution occurs; no license-boundary question arises.
+
+C) **Redistributing YAF together with necpp (or a Docker image / wheel
+   / binary that bundles necpp).** This is the case that most likely
+   triggers a GPL combined-work obligation. We *do not currently ship*
+   such a bundle, and the project's published artifacts deliberately
+   exclude necpp. If you build a private fork that bundles necpp into
+   an image, package, or executable, the combined distributed artifact
+   would be subject to GPL-2 terms; please consult counsel before
+   doing so.
+
+D) **The nec2c command-line executable (also GPL-2).** YAF's original
+   adapter code path called the `nec2c` command-line binary via
+   `subprocess`. The FSF has historically classified pure subprocess
+   invocation as "mere aggregation" rather than combined work, on the
+   reasoning that the two programs do not share an address space.
+   An earlier YAF release replaced this subprocess path with the
+   in-process `necpp` Python binding for performance, and the subprocess
+   code was removed. **A future minor release may restore the subprocess path
+   as an optional GPL-isolating backend** for deployments where the
+   in-process combination is unacceptable; see "Suggested mitigations"
+   below.
+
+### Suggested mitigations (for downstream redistributors)
+
+If you need to redistribute YAF in a form that imports `necpp`:
+
+1. **Treat the bundled product as GPL-2.** Add a top-level COPYING
+   file with the GPL-2 text, ensure the source of the entire combined
+   work is offered, and meet the other GPL-2 obligations.
+
+2. **Use the (currently unimplemented) subprocess back-end.** Restore
+   a `nec2c`-via-`subprocess` evaluator and offer the user a choice
+   between the fast in-process `necpp` backend (which makes the
+   combined process GPL-touching) and the slower subprocess backend
+   (which the FSF generally classifies as mere aggregation). Track
+   this as a future enhancement in CHANGELOG.
+
+3. **Replace the MoM backend.** The `yaf_solvers/` adapter pattern
+   makes it straightforward to substitute a non-GPL MoM solver
+   (proprietary engines like HFSS / FEKO / WIPL-D, or BSD-licensed
+   alternatives) and exclude `nec2_adapter` from the redistributed
+   build entirely.
+
+### Where you can read the original licenses
+
+- `necpp` / `nec2++` source and COPYING (GPL-2):
+  https://github.com/tmolteno/necpp
+- GPL-2.0 full text:
+  https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+- FSF "GPL Frequently Asked Questions" on linking & combined works:
+  https://www.gnu.org/licenses/gpl-faq.html
+
+---------------------------------------------------------------------
+2. Other dependencies (informational, not exhaustive)
+---------------------------------------------------------------------
+
+| Dependency           | License                | YAF coupling     |
+|----------------------|------------------------|------------------|
+| NumPy, SciPy         | BSD-3-Clause           | hard dependency  |
+| Matplotlib           | PSF / matplotlib       | optional (demos) |
+| PyTorch              | BSD-3-Clause           | hard (AI module) |
+| JAX, Flax, Optax     | Apache-2.0             | hard (diff-FDTD) |
+| Pydantic v2          | MIT                    | hard             |
+| FastAPI, Starlette   | MIT                    | hard (API)       |
+| SQLAlchemy           | MIT                    | hard (DB)        |
+| Celery               | BSD-3-Clause           | hard (worker)    |
+| scikit-rf            | BSD-3-Clause           | hard (RF I/O)    |
+| openEMS / CSXCAD     | GPL-3.0                | OPTIONAL; same   |
+|                      |                        | GPL caveats as   |
+|                      |                        | necpp apply if   |
+|                      |                        | bundled          |
+| pythonocc-core / OCC | LGPL-2.1 (mostly)      | optional         |
+| trimesh, gmsh        | MIT / GPL respectively | optional         |
+| Qdrant client        | Apache-2.0             | optional         |
+| MinIO client         | Apache-2.0             | optional         |
+| Three.js (frontend)  | MIT                    | bundled in       |
+|                      |                        | frontend/dist    |
+
+A definitive bill of materials should be regenerated against the
+actual installed environment at distribution time (e.g. via
+`pip-licenses` or `pipdeptree`); the table above is documentation,
+not a substitute for that artifact.
+
+---------------------------------------------------------------------
+3. References from openEMS (also GPL-3) — same caveats
+---------------------------------------------------------------------
+
+The `yaf_solvers/openems_adapter/` adapter is currently in its
+analytical-fallback state (it does not yet import openems / CSXCAD at
+runtime — see `docs/HONEST_STATUS.md`). If a future release enables the
+real openEMS Python bindings, the GPL-3 considerations are analogous
+to the necpp case above, with one practical difference: openEMS
+upstream itself uses GPL-3 with an explicit no-restriction stance on
+linking, but the safe assumption for redistribution is still that
+combined works inherit GPL-3.
+
+---------------------------------------------------------------------
+4. Reference projects under `_reference/` (not redistributed)
+---------------------------------------------------------------------
+
+During development, a number of open-source projects are shallow-cloned
+into `_reference/` for study, never committed. The `_reference/`
+directory is `.gitignore`d. None of those projects' source code is
+included in this repository's tracked files.
+
+---------------------------------------------------------------------
+5. Pending legal review
+---------------------------------------------------------------------
+
+The following items are flagged in `docs/HONEST_STATUS.md` as pending
+legal review before any public release that depends on the legal
+characterization being correct:
+
+- The in-process `import necpp` combination story above (sections 1
+  and 1.B–1.D). The interpretation given here is the most common
+  reading; a downstream redistributor's lawyer may disagree.
+- Whether to ship a subprocess-based necpp adapter as the default for
+  the next minor release in order to make the mere-aggregation story
+  unambiguous.
+- The openEMS GPL-3 path once implemented.

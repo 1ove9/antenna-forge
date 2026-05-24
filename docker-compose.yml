@@ -1,0 +1,121 @@
+# ============================================================
+# Source Sequence Antenna Forge (YAF) — Docker Compose
+# docker compose up -d
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: yaf-postgres
+    environment:
+      POSTGRES_USER: yaf
+      POSTGRES_PASSWORD: yaf_secret
+      POSTGRES_DB: yaf
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaf"]
+      interval: 5s
+      retries: 10
+    networks:
+      - yaf-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: yaf-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    networks:
+      - yaf-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: yaf-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - yaf-net
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: yaf-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - yaf-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yaf-api
+    command: uvicorn yaf_api.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - yaf-net
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yaf-worker
+    command: celery -A yaf_worker.celery_app worker --loglevel=info --concurrency=4
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - yaf-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yaf-frontend
+    command: pnpm dev --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - yaf-net
+
+volumes:
+  pgdata:
+  minio_data:
+  qdrant_data:
+
+networks:
+  yaf-net:
+    driver: bridge

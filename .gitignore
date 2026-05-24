@@ -1,0 +1,86 @@
+# --- Local reference material (not committed) ---
+_reference/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# --- ML / data ---
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.npy
+*.npz
+*.pkl
+runs/
+checkpoints/
+mlruns/
+wandb/
+
+# --- Solver outputs ---
+*.s1p
+*.s2p
+*.snp
+*.csx
+*.xml.bak
+openems_run_*/
+
+# --- Docker / infra ---
+.docker/
+postgres-data/
+minio-data/
+qdrant-data/
+redis-data/
+
+# --- Misc ---
+test_write.txt
+*.tmp
+*.bak
+
+# --- Private maintainer notes (never published) ---
+docs/PLACEHOLDERS.md

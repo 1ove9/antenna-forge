@@ -1,0 +1,28 @@
+[plugin]
+id = "openems-adapter"
+name = "openEMS FDTD Adapter"
+version = "0.1.0"
+type = "solver"
+description = "FDTD electromagnetic solver via openEMS + CSXCAD"
+author = "Source Sequence"
+license = "MIT"
+
+[entrypoint]
+module = "yaf_solvers.openems_adapter.adapter"
+class = "OpenEMSAdapter"
+
+[capabilities]
+methods = ["fdtd"]
+frequency_range = [1e6, 100e9]
+max_cells = 100000000
+gpu = false
+boundary_conditions = ["pml", "pec", "pmc", "periodic", "mur"]
+excitation_types = ["lumped", "waveguide", "plane_wave"]
+
+[dependencies]
+python = ">=3.11"
+packages = ["openems", "CSXCAD", "h5py"]
+
+[docs]
+homepage = "https://openems.de"
+tutorial = "https://docs.openems.de/python/"

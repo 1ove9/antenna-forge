@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the honest status doc first
+    url: https://github.com/REPLACE_ME/yaf/blob/main/docs/HONEST_STATUS.md
+    about: >
+      Many "the solver gives wrong numbers" or "this module doesn't do
+      what the README claims" reports are actually documented in
+      HONEST_STATUS. Please skim it before opening an issue.
+  - name: Read the Yagi case study
+    url: https://github.com/REPLACE_ME/yaf/blob/main/docs/case_study_yagi.md
+    about: >
+      Questions about how the AI × real-NEC2 loop works in practice are
+      usually answered in the Yagi case study end-to-end.

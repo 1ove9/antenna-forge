@@ -1,0 +1,104 @@
+[project]
+name = "yaf"
+version = "0.1.0"
+description = "Source Sequence Antenna Forge — AI-driven antenna invention platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Source Sequence", email = "176198826+1ove9@users.noreply.github.com" }
+]
+keywords = [
+    "antenna", "electromagnetics", "fdtd", "mom", "metasurface",
+    "ris", "inverse-design", "deep-learning", "optimization"
+]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    "celery[redis]>=5.4.0",
+    "redis>=5.0.0",
+    "websockets>=13.0",
+    "numpy>=1.26.0",
+    "scipy>=1.14.0",
+    "trimesh>=4.4.0",
+    "gmsh>=4.13.0",
+    "torch>=2.4.0",
+    "jax>=0.4.30",
+    "jaxlib>=0.4.30",
+    "flax>=0.9.0",
+    "optax>=0.2.0",
+    "qdrant-client>=1.10.0",
+    "minio>=7.2.0",
+    "structlog>=24.4.0",
+    "prometheus-client>=0.20.0",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.5.0",
+    "mypy>=1.11.0",
+    "black>=24.0.0",
+    "pre-commit>=3.8.0",
+]
+cad = ["pythonocc-core>=7.8.0"]
+solvers = ["pyaedt>=0.10.0"]
+gpu = ["cupy-cuda12x>=13.0.0"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+# Pragmatic relaxations for a codebase that interops heavily with numpy /
+# torch / jax, where most "Any" returns come from third-party libraries that
+# do not yet ship precise stubs. Other strict checks (no-untyped-def,
+# disallow_any_generics, strict_equality, …) stay on.
+warn_return_any = false
+disallow_untyped_calls = false
+disallow_subclassing_any = false
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+    "OCC.*",
+    "trimesh.*",
+    "gmsh.*",
+    "skrf.*",
+    "openems.*",
+    "CSXCAD.*",
+    "necpp.*",
+    "qdrant_client.*",
+    "minio.*",
+    "celery.*",
+]
+ignore_missing_imports = true
+ignore_errors = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["yaf_core*", "yaf_ai*", "yaf_solvers*", "yaf_cad*", "yaf_api*", "yaf_worker*", "yaf_db*"]
