@@ -159,7 +159,7 @@ python3 scripts/plot_yagi.py     # → docs/assets/yagi_design.png
 
 ```bash
 # Clone the project / 克隆项目
-git clone <repo-url> yaf && cd yaf
+git clone https://github.com/1ove9/antenna-forge.git yaf && cd yaf
 
 # Copy the env template / 复制环境变量
 cp .env.example .env
