@@ -22,8 +22,9 @@
 ## ADR-006: In-memory stores for API demo, PostgreSQL for production
 **Decision**: API routers use dict-based stores by default, SQLAlchemy models ready for production.
 
-## ADR-007: Analytical fallback for solver adapters
-**Decision**: When solver executables are unavailable, adapters compute results analytically (induced EMF for dipoles, array factor for metasurfaces).
+## ADR-007: Analytical fallback for solver adapters (SUPERSEDED 2026-05-25)
+**Original decision (2026-05-15)**: When solver executables are unavailable, adapters compute results analytically (induced EMF for dipoles, array factor for metasurfaces).
+**Superseded**: Both production solver paths now call real solvers and never fabricate results. NEC2 moved to the `necpp` Method-of-Moments binding (2026-05-24) and openEMS to the `openEMS` / `CSXCAD` full-wave FDTD bindings (2026-05-25); each removed its analytical fallback entirely, and a missing backend now raises `SolverUnavailable` instead of returning a plausible-looking `SimulationResult`. Known-answer regressions live in `scripts/verify_dipole.py` (NEC2, ~73 Ω half-wave dipole) and `scripts/verify_patch.py` (openEMS, microstrip patch resonance within 3.1 % of the cavity model). The remaining skeleton adapters (MEEP / HFSS / CST / FEKO / COMSOL) return an explicit `skeleton_not_implemented` status rather than a fabricated result. See `docs/HONEST_STATUS.md` §1.1–1.2.
 
 ## ADR-008: uv for Python, pnpm for frontend
 **Decision**: Package management split: uv for Python dependencies, pnpm for Node.js.
@@ -55,6 +56,8 @@
 |-----------|----------|--------|
 | 2026-05-15 | OpenEMSAdapter analytical fallback | Enables testing without solver binary |
 | 2026-05-15 | NEC2Adapter induced EMF method | Physics-realistic S11/gain for demo |
+| 2026-05-24 | NEC2Adapter switched to real `necpp` MoM; analytical fallback removed | Honest results: missing `necpp` raises `SolverUnavailable`; `verify_dipole.py` truth check (~73 Ω) passes |
+| 2026-05-25 | OpenEMSAdapter switched to real openEMS full-wave FDTD; analytical fallback removed | Honest results: missing `openEMS`/`CSXCAD` bindings raise `SolverUnavailable`; `verify_patch.py` patch resonance within 3.1 % of the cavity model |
 | 2026-05-15 | VAE 32x32 grid input | Resolution vs training speed balance |
 | 2026-05-15 | PML thickness=8 cells | Standard FDTD literature value |
 | 2026-05-15 | Cholesky GP implementation | Stable for <1000 observations |
