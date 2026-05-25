@@ -67,10 +67,16 @@ commercially material.
 
 ### 1.4 Optional: openEMS backend
 
-`yaf_solvers/openems_adapter/` is currently in its analytical
-fallback state; you do not need to install openems/CSXCAD to develop
-against the rest of the codebase. If a future PR brings the real
-openems FDTD path online, the GPL-3 caveats in `NOTICE` will apply.
+`yaf_solvers/openems_adapter/` is a real openEMS full-wave FDTD backend.
+You do not need to install openEMS/CSXCAD to develop against the rest of
+the codebase — the openEMS integration test and `scripts/verify_patch.py`
+skip (or raise `SolverUnavailable`) when the bindings are absent, and they
+are not required for the other acceptance commands. To run the openEMS
+path, build openEMS with its Python interface and point
+`CSXCAD_INSTALL_PATH` / `OPENEMS_INSTALL_PATH` / `LD_LIBRARY_PATH` at the
+install so `from openEMS import openEMS` / `from CSXCAD import
+ContinuousStructure` import. Because this loads the GPL-3 openEMS bindings
+into the same process, the GPL-3 caveats in `NOTICE` apply once you do.
 
 ---
 

@@ -121,7 +121,7 @@
 | `yaf_ai/generative/diffusion.py` | 🟡 | DDPM 架构正确、能采样；同 VAE，**未接物理 oracle**。 |
 | `yaf_ai/surrogate/fno_solver.py` | **🔴** | FNO 架构搭好了，**权重是随机初始化，没训过、pipeline 没人调用**。ADR-013 决定本轮不接活（理由：要可靠的 FNO 代理需要数千样本训练 + 主动学习策略，现有预算做不出可信版本）。 |
 | `yaf_ai/surrogate/deeponet.py` | 🔴 | 同 FNO，未训未用。 |
-| `yaf_ai/inverse_design/pipeline.py`（六阶段框架） | 🟡 | 六阶段 `generate → screen → refine → topo → verify → score` 能跑通，但 `verify` 当前用 openEMS fallback（**不是** Yagi case 那条 NEC2 真值路径）。**框架在，但管线里跑的物理 oracle 是 fake**。要让它真正"工作"需要把 verify 切到 `nec2_adapter`，是个独立工程。 |
+| `yaf_ai/inverse_design/pipeline.py`（六阶段框架） | 🟡 | 六阶段 `generate → screen → refine → topo → verify → score` 能跑通。`verify` 现在调的是真实求解器（先试 openEMS、失败再退 NEC2，两者都已无解析降级、不会伪造结果），但 pipeline 默认喂的几何是 VAE 出的 2D 二值栅格图——既不是 openEMS 能直接仿的结构化盒 + 端口，也不是 NEC2 的线天线，所以**生成式这条路目前还没真正接上物理 oracle**。缺的是"VAE 输出 → 可仿真几何"的转换层，而**不是**求解器在造假。Yagi case 那条 +4 dB 真值路径绕开了本管线。 |
 | `yaf_ai/optimization/nsga.py` (NSGA-II) | 🟡 | ZDT1 玩具能跑出 Pareto front；本轮没选它（单目标 + 约束，DE 更合适，见 ADR-012）。 |
 | `yaf_ai/optimization/topology_opt.py` (SIMP) | 🟡 | SIMP + OC 更新规则；demo 在 2D 合成 compliance 问题上能跑，**没接电磁仿真**。 |
 

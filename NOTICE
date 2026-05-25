@@ -140,14 +140,16 @@ not a substitute for that artifact.
 3. References from openEMS (also GPL-3) — same caveats
 ---------------------------------------------------------------------
 
-The `yaf_solvers/openems_adapter/` adapter is currently in its
-analytical-fallback state (it does not yet import openems / CSXCAD at
-runtime — see `docs/HONEST_STATUS.md`). If a future release enables the
-real openEMS Python bindings, the GPL-3 considerations are analogous
-to the necpp case above, with one practical difference: openEMS
-upstream itself uses GPL-3 with an explicit no-restriction stance on
-linking, but the safe assumption for redistribution is still that
-combined works inherit GPL-3.
+The `yaf_solvers/openems_adapter/` adapter imports the openEMS / CSXCAD
+Python bindings at runtime and runs a real full-wave FDTD solve (see
+`docs/HONEST_STATUS.md`). The GPL-3 considerations are therefore now
+live and analogous to the necpp case above, with one practical
+difference: openEMS upstream itself uses GPL-3 with an explicit
+no-restriction stance on linking, but the safe assumption for
+redistribution is still that combined works inherit GPL-3. As with
+necpp, this repository does not bundle or redistribute openEMS / CSXCAD;
+users build and install them separately, and the bindings are not a hard
+dependency in `pyproject.toml`.
 
 ---------------------------------------------------------------------
 4. Reference projects under `_reference/` (not redistributed)
@@ -172,4 +174,6 @@ characterization being correct:
 - Whether to ship a subprocess-based necpp adapter as the default for
   the next minor release in order to make the mere-aggregation story
   unambiguous.
-- The openEMS GPL-3 path once implemented.
+- The openEMS / CSXCAD in-process GPL-3 binding combination, now live
+  in `yaf_solvers/openems_adapter/` (same in-process reading as the
+  necpp item above).

@@ -20,6 +20,13 @@ are deferred to a maintainer review pass.
   half-wave dipole truth check (300 MHz) matches textbook values
   (R = 68.30 Ω vs 73 Ω, gain 2.12 dBi vs 2.15 dBi) to within published
   thin-wire tolerances.
+- **Real full-wave FDTD simulation end-to-end.** The openEMS adapter
+  now drives the `openEMS` / `CSXCAD` Python bindings directly (build CSX
+  structure → mesh refinement → lumped-port excitation → time-domain
+  run → S11/Zin from the port, gain pattern from NF2FF). The rectangular
+  microstrip patch truth check (`scripts/verify_patch.py`) puts the
+  simulated resonance within 3.1 % of the cavity-model prediction
+  (2.435 GHz vs 2.513 GHz, S11 dip −27 dB).
 - **AI × real solver inverse design.** A 9-parameter Yagi-Uda case
   study (`scripts/case_yagi.py`) drives `scipy.optimize.differential_evolution`
   with NEC2 in every objective evaluation (5858 calls in 12.7 s wall
@@ -100,13 +107,19 @@ are deferred to a maintainer review pass.
 - The analytical `cos(π/2 cos θ) / sin θ` placeholder pattern in
   `FarFieldResult.e_theta` (commit `d9a0b26`); replaced with real
   per-direction NEC2 gain values.
+- The analytical RLC fallback in `yaf_solvers/openems_adapter/adapter.py`
+  (the `s11 = detuning / (detuning + 1j·0.1)` placeholder and the dead
+  `import openems` path that never imported). Replaced with a real
+  openEMS full-wave FDTD path; missing `openEMS` / `CSXCAD` bindings now
+  raise `SolverUnavailable`.
 
 ### Known limitations (carried into next release)
 
-- The `yaf_solvers/openems_adapter/` adapter still uses an analytical
-  RLC fallback. Bringing it up to the NEC2 adapter's standard (real
-  openEMS Python bindings, `SolverUnavailable` on miss) is the next
-  natural release task.
+- The `yaf_solvers/openems_adapter/` adapter is now a real openEMS
+  full-wave FDTD backend, but its truth coverage is a single known-answer
+  case (patch resonance); reported gain is the NF2FF directivity
+  (`10·log10(Dmax)`, not a mismatch-discounted realized gain), and only
+  single-port lumped excitation has been validated.
 - `yaf_ai/inverse_design/pipeline.py` is the six-stage
   generate/screen/refine/topo/verify/score framework, but its `verify`
   step expects 2D voxel geometries that the NEC2 adapter correctly
