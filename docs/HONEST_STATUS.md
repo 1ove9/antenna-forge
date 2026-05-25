@@ -8,6 +8,12 @@
 "真实接入 / Demo only / 占位/死代码"三档重新逐项标注。所有论断都对应到具体源码
 行号 + commit 号，可以核对。
 
+**2026-05-25 修订** —— openEMS 路径从"解析降级占位（RLC fallback）"升级为
+"真实 full-wave FDTD in the loop"：适配器现在通过 openEMS Python 绑定真正建模、
+跑时域迭代、从端口提取 S11/输入阻抗、用 NF2FF 提取增益方向图；解析 fallback 已
+删除，绑定缺失 → `SolverUnavailable`。新增 `scripts/verify_patch.py` 矩形微带贴片
+真值校验：实测谐振 2.435 GHz vs 解析 2.513 GHz，误差 3.1%，落在 ±10% 内。
+
 ## 0a. 待法律审查项（pending legal review）
 
 公开发布前**必须**由合格法务复核：
@@ -18,7 +24,7 @@
    - 不在仓库里分发任何 necpp 源码或编译产物；
    - 在仓库根目录 `NOTICE` 文件里把上述边界、风险、下游再分发者的缓解建议全部写明。
    这套定性是发布前**最重要**的法务复核项。下游再分发者（要打 Docker 镜像 / wheel / 二进制）应另请律师。
-2. `yaf_solvers/openems_adapter/` 一旦启用真实 openems Python 绑定，GPL-3 类似问题同样适用。当前还是 fallback 状态，未触发。
+2. **`yaf_solvers/openems_adapter/adapter.py` 现在通过 `from openEMS import openEMS` / `from CSXCAD import ContinuousStructure` 把 GPL-3 的 openEMS 绑定加载进同一 Python 进程**（2026-05-25 起，已不再是 fallback）。与 necpp 同样的"共享进程组合作品"定性适用，所以这一项**已被触发**，须和上面 NEC2 那条一并复核。当前应对策略与 necpp 一致：不在 `pyproject.toml` 里列为硬依赖、用户自行编译安装 openEMS、仓库不分发其源码或编译产物。
 3. 一个工程层面的缓解方案是恢复"subprocess 调 `nec2c`"的可选后端——FSF 通常把纯 subprocess 划入"mere aggregation"而非组合作品。这条路径在 NEC2 适配器改写时被删掉以换取性能，下个 minor release 可以补回来作为 GPL 隔离选项。
 
 详见 `NOTICE`。本节中文摘录仅为内部备忘，**不构成法律意见**。
@@ -32,7 +38,7 @@
 | NEC2 适配器真实性 | D（全部走 fallback） | **A**（真实 `necpp` MoM；fallback 已删除；missing necpp → `SolverUnavailable`） |
 | 已知答案物理回归测试 | C−（基本没有） | **B**（半波偶极子真值；逆向设计与 Yagi 案例都有 NEC2 验证） |
 | AI 模块在物理评测下的有效性 | D（没接物理 oracle） | **C+**（Yagi case：scipy DE × 真实 NEC2 跑出 +4 dB 的工程意义结果；但生成式 VAE/扩散仍未接入物理 oracle） |
-| openEMS 适配器真实性 | D（fallback） | D（仍是 fallback；本轮没动） |
+| openEMS 适配器真实性 | D（fallback） | **B+**（2026-05-25：真实 full-wave FDTD；fallback 已删；缺绑定 → `SolverUnavailable`；通过贴片 ±10% 真值，但目前仅 1 个已知答案案例） |
 | FNO/DeepONet 代理模型 | D（死代码，未训练） | D（仍是；ADR-013 决定本轮不接活，先把状态写准）|
 
 下面按模块给细节。
@@ -57,17 +63,25 @@
 2.45 GHz 自由空间半波偶极子 S11 ≈ −8.56 dB，Gain = 2.20 dBi，VSWR = 2.59。
 这些数字依赖你喂进去的几何 —— 改单元长度就会改 S11，不再是硬编码。
 
-### 1.2 openEMS (`yaf_solvers/openems_adapter/`)
+### 1.2 openEMS (`yaf_solvers/openems_adapter/`) — **🔄 大幅升级（2026-05-25）**
 
-| 项 | 状态 |
-|---|---|
-| **CSXCAD XML 序列化 (`to_native_format`)** | ✅ 真实：发出有效的 `<ContinuousStructure>` XML，但只导出 metal box，不带网格指令/NF2FF/激励，**只是几何而不是完整 CSX 工程**。 |
-| **`_run_with_openems_api` (Python 绑定)** | ⚠️ 代码路径存在，依赖 `import openems` + `import CSXCAD`。当前主机两个包都没装，所以**每次走 fallback**。即便能 import，里面的 `AddDump`/`AddLumpedPort` 调用还需要真实端口位置才不会出 ValueError。 |
-| **fallback `_run_analytical`** | ❌ **简单 RLC 谐振模型**：`s11 = detuning/(detuning + 1j·0.1)` 是一阶谐振，完全不带几何依赖。max_dim 影响谐振频率 `f_res = c0/(2·max_dim)`，仅此而已。 |
+| 项 | 旧状态 | 新状态（2026-05-25） |
+|---|---|---|
+| **求解器后端** | `import openems`（错误的小写模块名，永远 import 失败）→ 每次走 fallback | ✅ **真实 openEMS full-wave FDTD**：`from openEMS import openEMS` / `from CSXCAD import ContinuousStructure`，`solve()` 真正建 CSX 结构（metal/material 盒）、`AddEdges2Grid` + `SmoothMeshLines` 细化网格、`AddLumpedPort` 激励、`Run()` 跑时域迭代。 |
+| **fallback `_run_analytical`（RLC 占位）** | ❌ 一阶 RLC：`s11 = detuning/(detuning + 1j·0.1)`，几乎不带几何依赖 | ✅ **已删除**。openEMS 绑定装不上 → `SolverUnavailable`；没有 structures/ports → `SolverError`。**没有任何"安静返回假值"的代码路径还剩下**（与 NEC2 一致）。 |
+| **S11 / 输入阻抗** | ❌ 来自 RLC 占位 | ✅ **真值**：`LumpedPort.CalcPort` → `uf_ref/uf_inc` 得 S11、`uf_tot/if_tot` 得 Zin，全频段一次时域迭代得到。 |
+| **远场 / 增益方向图** | ❌ `sin(θ)` 占位 | ✅ **真值**：`CreateNF2FFBox` + `CalcNF2FF` 近场转远场，`Dmax → 10·log10(Dmax)` dBi，E 场方向图存入 `FarFieldResult`。 |
+| **CSXCAD XML 序列化 (`to_native_format`)** | ✅ 真实但只是几何 | ✅ 不变：发出有效 `<ContinuousStructure>` XML（metal box 几何），作为轻量序列化辅助；真正 solve 不走这条文本路径，直接用绑定建 CSX。 |
+| **矩形微带贴片真值回归** | 无 | ✅ **`scripts/verify_patch.py`**：Rogers RO4003C 贴片（εr=3.38、h=1.524 mm、L=32 mm、W=40 mm），实测谐振 **2.435 GHz** vs 腔模解析公式 **2.513 GHz**，误差 **3.1%**（容差 ±10%），S11 谷 −27 dB、Zin 46.2−1.9j Ω、方向性 6.81 dBi、103635 网格、12 s 收敛。`pytest tests/integration/test_pipeline.py::test_solver_openems_integration` 跑一个缩小版真实贴片（无绑定时 skip）。 |
+
+> 仍诚实标注的边界：目前只有**一个**已知答案校验案例（贴片谐振频率），不像 NEC2
+> 那条线有偶极子 + 逆向设计 + Yagi 三重验证；增益按方向性 `10·log10(Dmax)` 给出
+> （未单独扣除失配/欧姆损耗，故为方向性而非含失配的 realized gain，已在 metadata
+> 里以 `directivity_dbi` 标注）；只验过单端口 lumped 激励，MSL/波导端口未走真值。
 
 ### 1.3 MEEP / HFSS / CST / FEKO / COMSOL
 
-全部是 **skeleton**，`solve()` 直接返回 `status="skeleton_not_implemented"`（5 个 `adapter.py` 共 ~17 行内容）。集成测试里它们不会被调到，所以不影响 45/45 pytest 绿。
+全部是 **skeleton**，`solve()` 直接返回 `status="skeleton_not_implemented"`（5 个 `adapter.py` 共 ~17 行内容）。集成测试里它们不会被调到，所以不影响 47/47 pytest 绿。
 
 ### 1.4 `MaterialLibrary.get_dispersive_permittivity`
 
@@ -87,7 +101,7 @@
   和教科书一致；想 −10 dB 需要加匹配网络。**
 - `Best S11: −8.56 dB @ 2.400 GHz` —— 真实扫频结果。
 
-**评级**：管线跑通 ✅，物理可信度 ✅（NEC2 路径；openEMS 仍是 fallback，下文 §1.2）。
+**评级**：管线跑通 ✅，物理可信度 ✅（NEC2 路径；openEMS 路径自 2026-05-25 起也是真实 full-wave，见 §1.2）。
 
 ---
 
@@ -192,23 +206,26 @@ ignore_missing_imports = true
 
 ## 5. 测试的真实强度
 
-`pytest tests/ -x -q → 45 passed` 这一行非常容易被误读为"45 个真实场景验证通过"。实际分布：
+`pytest tests/ -x -q → 47 passed` 这一行非常容易被误读为"47 个真实场景验证通过"。实际分布：
 
 | 文件 | 案例数 | 多少是"结构断言/能跑就过"，多少是"对解析解" |
 |---|---|---|
 | `tests/unit/test_domain.py` | 13 | **0 个**对解析解。全部是 Pydantic 字段存在、状态机迁移、序列化反序列化能 round-trip。 |
 | `tests/unit/test_geometry.py` | 8 | **0 个**对解析解。检查 `num_vertices > 0` / `num_faces > 0` / `box.volume == 100`。`make_box` 期望 8 个顶点 12 个面——这是 BREP→mesh 拓扑断言，没验几何正确性。 |
 | `tests/unit/test_physics.py` | 9 | **1 个半**：`test_copper` 验证 sigma=5.8e7 但那是 seed 值；`test_ris_element` 验证 2-bit RIS 4 个状态、相位 0/90/180/270 ✅；其余 `assert isinstance(eps, complex)` 类型断言、`af.shape == (37, 73)` 形状断言。 |
-| `tests/unit/test_solvers.py` | 7 | **0 个**对解析解。检查 NEC 卡片字符串里有 `"GW"`/`"GE"` 之类，OpenEMS XML 字节里有 `"ContinuousStructure"`，`status == "success"`，`gain_dbi is not None`。 |
+| `tests/unit/test_solvers.py` | 8 | **0 个**对解析解（结构断言为主）。检查 NEC 卡片字符串里有 `"GW"`/`"GE"`、OpenEMS XML 里有 `"ContinuousStructure"`、`status == "success"`、`gain_dbi is not None`；外加 NEC2 与 openEMS 各一个"空几何必须抛错、绝不伪造结果"的诚实性断言。真正的 openEMS ±10% 真值在 `scripts/verify_patch.py`（脚本，不在 pytest 里）。 |
 | `tests/integration/test_api.py` | 2 | `/health` 返 200 + `{"status":"ok"}`。**不验证业务逻辑**。 |
-| `tests/integration/test_pipeline.py` | 3 | `loop_count >= 1`、`len(s_params.frequency) == 21`、`gain_dbi is not None`。**0 个**和参考值对比。 |
+| `tests/integration/test_pipeline.py` | 3 | `loop_count >= 1`、`len(s_params.frequency) == 21`、`gain_dbi is not None`。openEMS 那条现在跑的是**真实 full-wave** 缩小贴片（无绑定时 skip），但断言仍是结构层（频点数、gain 非空、backend 名），**不在这里**和参考值对比——数值真值留给 `scripts/verify_patch.py`。 |
 
-**总评**：45 个测试里**恐怕只有 `test_ris_element` 和 `test_bounding_box` 是真的在断言一个物理/几何"对不对"，其他 43 个都是"管线跑通"** 的断言。这不是说它们没价值——这种"smoke + 结构"层的测试能挡住空指针、null 字段、API 签名漂移——但**它们完全无法替代"对照 HFSS / openEMS 真值的回归测试"**。
+**总评**：47 个 pytest 测试里**真的在断言物理/几何"对不对"的仍是少数**（`test_ris_element`、`test_bounding_box`，以及 NEC2 偶极子单测里的 R/gain 容差断言），其余多数是"管线跑通 + 结构"断言。这不是说它们没价值——这种"smoke + 结构"层的测试能挡住空指针、null 字段、API 签名漂移——但**它们无法替代"对照解析解/HFSS 真值的回归测试"**。真正的已知答案校验放在脚本里：`scripts/verify_dipole.py`（NEC2）与 `scripts/verify_patch.py`（openEMS）。
 
-下一步要补的应该是"已知答案"测试：
-- 半波偶极子在自由空间 73 + j42 Ω（容差 ±10%）
-- 1λ 矩形贴片在 FR-4 上 50 Ω 输入阻抗、−15 dB 谐振
+已经补上的"已知答案"校验：
+- ✅ 半波偶极子在自由空间 ~73 Ω（`verify_dipole.py`，真实 NEC2）
+- ✅ 矩形微带贴片谐振频率对腔模解析公式 ±10%（`verify_patch.py`，真实 openEMS：实测 2.435 GHz vs 解析 2.513 GHz，误差 3.1%）
+
+仍待补：
 - 2-bit RIS 阵列在指定相位码本下主瓣方向（用 array factor 验）
+- 贴片输入阻抗/带宽对参考值的回归（目前只验了谐振频率，没把 Zin/−10 dB 带宽纳入断言）
 
 ---
 
@@ -230,7 +247,7 @@ ignore_missing_imports = true
 | 项目骨架完整度 / Pydantic 领域模型 | A | A | 无变化 |
 | 求解器适配器接口设计（Protocol） | A− | A− | 无变化 |
 | **NEC2 求解器物理可信度** | D | **A** | 自 NEC2 适配器改写起真实 necpp MoM；fallback 已删 |
-| openEMS 求解器物理可信度 | D | D | 未动；仍是 fallback |
+| openEMS 求解器物理可信度 | D | **B+** | 2026-05-25：真实 full-wave FDTD；fallback 已删；通过贴片 ±10% 真值；目前仅 1 个已知答案案例、增益按方向性给出 |
 | MEEP/HFSS/CST/FEKO/COMSOL 适配器 | skeleton | skeleton | 未动 |
 | 可微 FDTD 实现复杂度 vs 论文级 | C | C | 未动 |
 | AI 生成模型架构（VAE/Diffusion） | B | B | 未动 |
@@ -239,12 +256,13 @@ ignore_missing_imports = true
 | 已知答案物理回归测试 | C− | **B** | `verify_dipole.py` + 单元测试 + 集成测试都断言真实物理量 |
 | mypy --strict | B+ | B+ | 未动 |
 | 一键 docker compose / 健康检查 | A | A | 未动 |
-| 距离"能用 YAF 发明出可制造的真天线" | **远** | **稍近**：Yagi 案例是工程意义上可行的方向选择（DE × NEC2），但只覆盖了线天线参数化设计；3D / 表面贴片 / 拓扑级别还是远 |
+| 距离"能用 YAF 发明出可制造的真天线" | **远** | **稍近**：Yagi 案例是工程意义上可行的方向选择（DE × NEC2），贴片现在有真实 full-wave 求解器可用；但仍只覆盖线天线参数化设计 + 单个贴片真值，3D / 表面贴片优化 / 拓扑级别还是远 |
 
 ### 一句话总结
 
 > **2026-05-21 评级"远"主要因为所有求解器都走 fallback、AI 模块没接物理 oracle。**
 > **2026-05-24 后 NEC2 路径已经是真值，并且有了一个 +4 dB 的 Yagi 工程意义案例。**
-> 距离"发明真天线"依然远，但**距离"在 YAF 里跑一次真实 EM 仿真驱动的优化"已经
-> 是一行命令的事**（`python3 scripts/case_yagi.py`）。openEMS / 生成模型 / 代理
-> 模型这三条线还需要分别下力气。
+> **2026-05-25 后 openEMS 路径也是真实 full-wave 了，贴片谐振频率对解析公式 ±10%（实测 3.1%）。**
+> 距离"发明真天线"依然远，但**两条求解器主线（NEC2 线天线 MoM、openEMS full-wave
+> FDTD）现在都能跑真值**：`python3 scripts/case_yagi.py`、`python3 scripts/verify_patch.py`
+> 各是一行命令的事。生成模型 / 代理模型这两条线还需要分别下力气。
