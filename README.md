@@ -180,10 +180,10 @@ python -m yaf_ai.inverse_design.pipeline --demo
 python scripts/demo_dipole.py
 ```
 
-> ⚠️ See `docs/HONEST_STATUS.md`: the openEMS adapter still falls back to an
-> analytical path when openEMS is not installed; **NEC2 no longer falls
-> back** — when `necpp` is unavailable it explicitly raises
-> `SolverUnavailable`, so its output is always a real value.
+> See `docs/HONEST_STATUS.md`: **neither solver fabricates results.** NEC2
+> (`necpp`) and openEMS both run real solvers and raise `SolverUnavailable`
+> when their backend is missing — there is no silent analytical fallback on
+> either path.
 
 ## Acceptance commands
 
@@ -213,13 +213,16 @@ python scripts/demo_dipole.py                                 # → S11/VSWR/Pea
 # 7. NEC2 truth check vs textbook
 python3 scripts/verify_dipole.py                              # → PASS: R=68.30 Ω (err 6.4%), G=2.12 dBi
 
-# 8. 3-panel showcase PNG (Z sweep / polar pattern / S11+BW)
+# 8. openEMS truth check — real full-wave FDTD vs cavity model
+python3 scripts/verify_patch.py                               # → PASS: f_res 2.435 GHz vs 2.513 GHz (err 3.1%)
+
+# 9. 3-panel showcase PNG (Z sweep / polar pattern / S11+BW)
 python3 scripts/demo_wow.py                                   # → docs/assets/dipole_demo.png
 
-# 9. Closed-loop inverse design (real NEC2 in the loop)
+# 10. Closed-loop inverse design (real NEC2 in the loop)
 python3 scripts/demo_inverse_design.py                        # → 477.89 mm + inverse_design_convergence.png
 
-# 10. Yagi-Uda case study — 9-param DE × real NEC2
+# 11. Yagi-Uda case study — 9-param DE × real NEC2
 python3 scripts/case_yagi.py                                  # → baselines + opt JSON, +1.60 dB Pareto-dominant vs Viezbicke
 python3 scripts/plot_yagi.py                                  # → docs/assets/yagi_design.png
 
@@ -228,7 +231,7 @@ mypy yaf_core yaf_ai yaf_solvers --strict                     # → Success: no 
 ```
 
 A per-command credibility annotation lives in `docs/HONEST_STATUS.md`
-(revised 2026-05-24); "what's still missing once everything is green" is in
+(revised 2026-05-25); "what's still missing once everything is green" is in
 `docs/next-steps.md`; the full Yagi case-study walkthrough is in
 `docs/case_study_yagi.md`.
 
@@ -254,8 +257,8 @@ YAF source code is distributed under the **MIT License** — see
 
 **Third-party dependencies carry their own licenses, some of them
 copyleft.** In particular, the optional `necpp` Method-of-Moments
-backend (and a future `openems` FDTD backend) are GPL-licensed.
-YAF does not bundle or redistribute either of them; users install
+backend and the `openEMS` / `CSXCAD` FDTD backend are GPL-licensed.
+YAF does not bundle or redistribute any of them; users install
 them separately and assume the combined-work obligations that may
 result. See [`NOTICE`](NOTICE) for the full license-boundary
 discussion and mitigations for downstream redistributors. This is
@@ -265,19 +268,26 @@ provided in good faith and is not legal advice.
 ## Open-core model
 
 YAF follows an **open-core** model. This repository is the **core engine**:
-free, self-hostable, and MIT-licensed. It is focused on **wire antennas**
-(NEC2 Method-of-Moments) driven by **classical optimization** (differential
-evolution / golden-section search), and it is complete and useful on its own
-for that scope.
+free, self-hostable, and MIT-licensed. It covers **wire antennas** (NEC2
+Method-of-Moments) and **planar / patch antennas** (openEMS full-wave FDTD),
+driven by **classical optimization** (differential evolution / golden-section
+search), and it is complete and useful on its own for that scope.
 
 **Available now in this open-source core**
 
 - Wire-antenna simulation with real NEC2 Method-of-Moments via `necpp` — no
   analytical fallback (missing solver raises rather than fabricates).
+- Full-wave FDTD simulation with real openEMS (`openEMS` / `CSXCAD` Python
+  bindings): builds the CSX structure, runs the time-domain solve, and extracts
+  S11 / input impedance from the port and the gain pattern via NF2FF. Same
+  honesty rule — missing bindings raise `SolverUnavailable`, never fabricate.
 - Classical optimization with the real solver inside every iteration:
   half-wave dipole resonance search and the 9-parameter Yagi-Uda inverse
   design.
-- Known-answer truth checks and reproducible benchmarks (`docs/case_study_yagi.md`).
+- Known-answer truth checks and reproducible benchmarks: half-wave dipole
+  (`scripts/verify_dipole.py`, NEC2) and a rectangular microstrip patch
+  (`scripts/verify_patch.py`, openEMS — simulated resonance within 3.1 % of the
+  cavity-model prediction). See also `docs/case_study_yagi.md`.
 - FastAPI service, Pydantic domain models, and the solver / AI adapter
   interfaces.
 
@@ -289,10 +299,11 @@ open-source core or the enhanced edition.**
 
 **Planned / on the roadmap (not yet available)**
 
-- Full-wave solver integration (openEMS / HFSS / CST) for patch antennas,
-  microstrip arrays, metasurfaces, and full 3-D structures. *(The openEMS
-  adapter in this repo is currently an analytical-fallback stub, not a working
-  full-wave path — see `docs/HONEST_STATUS.md`.)*
+- Broader full-wave coverage — microstrip arrays, metasurfaces, and full 3-D
+  structures, plus commercial solvers (HFSS / CST / FEKO / COMSOL). *(The
+  openEMS FDTD backend is real and validated on a single patch-antenna
+  truth check today; wider geometry coverage and the commercial-solver
+  adapters are still on the roadmap — see `docs/HONEST_STATUS.md`.)*
 - Generative AI geometry design (diffusion / VAE) connected to a real physics
   oracle. *(These generative models exist in the repo today only as
   **early / experimental** code: trained on synthetic geometry, not yet wired

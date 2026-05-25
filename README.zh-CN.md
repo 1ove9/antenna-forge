@@ -167,9 +167,9 @@ python -m yaf_ai.inverse_design.pipeline --demo
 python scripts/demo_dipole.py
 ```
 
-> ⚠️ 见 `docs/HONEST_STATUS.md`：openEMS 适配器在没装 openEMS 时仍会走解析降级
-> 路径；**NEC2 不再降级** —— `necpp` 不可用时显式抛 `SolverUnavailable`，其输出
-> 永远是真值。
+> 见 `docs/HONEST_STATUS.md`：**两个求解器都不伪造结果。** NEC2（`necpp`）
+> 与 openEMS 都跑真实求解器，后端缺失时显式抛 `SolverUnavailable` —— 两条路径
+> 都没有任何静默的解析降级。
 
 ## 验收命令
 
@@ -198,13 +198,16 @@ python scripts/demo_dipole.py                                 # → 打印 S11/V
 # 7. NEC2 真值校验 vs 教科书
 python3 scripts/verify_dipole.py                              # → PASS: R=68.30 Ω (误差 6.4%), G=2.12 dBi
 
-# 8. 三联图展示 PNG（Z 扫描 / 极坐标方向图 / S11+带宽）
+# 8. openEMS 真值校验 —— 真实 full-wave FDTD vs 腔模解析公式
+python3 scripts/verify_patch.py                               # → PASS: 谐振 2.435 GHz vs 2.513 GHz (误差 3.1%)
+
+# 9. 三联图展示 PNG（Z 扫描 / 极坐标方向图 / S11+带宽）
 python3 scripts/demo_wow.py                                   # → docs/assets/dipole_demo.png
 
-# 9. 闭环逆向设计（真实 NEC2 在回路中）
+# 10. 闭环逆向设计（真实 NEC2 在回路中）
 python3 scripts/demo_inverse_design.py                        # → 477.89 mm + inverse_design_convergence.png
 
-# 10. Yagi-Uda 案例 —— 9 参数 DE × 真实 NEC2
+# 11. Yagi-Uda 案例 —— 9 参数 DE × 真实 NEC2
 python3 scripts/case_yagi.py                                  # → 基线 + 优化 JSON，+1.60 dB Pareto 占优 Viezbicke
 python3 scripts/plot_yagi.py                                  # → docs/assets/yagi_design.png
 
@@ -212,7 +215,7 @@ python3 scripts/plot_yagi.py                                  # → docs/assets/
 mypy yaf_core yaf_ai yaf_solvers --strict                     # → Success: no issues in 64 source files
 ```
 
-各条命令的逐条可信度标注见 `docs/HONEST_STATUS.md`（2026-05-24 修订）；"全绿之后
+各条命令的逐条可信度标注见 `docs/HONEST_STATUS.md`（2026-05-25 修订）；"全绿之后
 还差什么"见 `docs/next-steps.md`；Yagi 案例的完整讲解见
 `docs/case_study_yagi.md`。
 
@@ -236,24 +239,31 @@ mypy yaf_core yaf_ai yaf_solvers --strict                     # → Success: no 
 YAF 源代码以 **MIT 许可证** 发布 —— 见 [`LICENSE`](LICENSE)。
 
 **第三方依赖各自持有其许可证，部分为 copyleft。** 其中可选的 `necpp` 矩量法
-后端（及未来的 `openems` FDTD 后端）为 GPL 许可。YAF 不捆绑或再分发它们；用户
-自行安装，并自行承担由此可能产生的"组合作品"义务。完整的许可证边界讨论以及对
-下游再分发者的缓解建议见 [`NOTICE`](NOTICE)。本说明出于善意提供，不构成法律意见。
+后端，以及 `openEMS` / `CSXCAD` FDTD 后端，均为 GPL 许可。YAF 不捆绑或再分发
+它们；用户自行安装，并自行承担由此可能产生的"组合作品"义务。完整的许可证边界
+讨论以及对下游再分发者的缓解建议见 [`NOTICE`](NOTICE)。本说明出于善意提供，不
+构成法律意见。
 
 
 ## 开源核心版与增强版
 
 YAF 采用 **open-core（开源核心）** 模式。本仓库是**核心引擎**：免费、可自托管、
-MIT 许可，聚焦**线天线**（NEC2 矩量法）+ **经典优化**（差分进化 / 黄金分割搜索），
-在这个范围内是完整、可独立使用的。
+MIT 许可，覆盖**线天线**（NEC2 矩量法）与**平面 / 贴片天线**（openEMS full-wave
+FDTD），由**经典优化**（差分进化 / 黄金分割搜索）驱动，在这个范围内是完整、可
+独立使用的。
 
 **当前开源核心版已具备**
 
 - 基于 `necpp` 的真实 NEC2 矩量法线天线仿真 —— 无解析降级（求解器缺失时直接抛
   异常，绝不伪造结果）。
+- 基于真实 openEMS（`openEMS` / `CSXCAD` Python 绑定）的 full-wave FDTD 仿真：
+  自动建 CSX 结构、跑时域求解、从端口提取 S11 / 输入阻抗、用 NF2FF 提取增益方向
+  图。同样的诚实原则 —— 绑定缺失时抛 `SolverUnavailable`，绝不伪造结果。
 - 真实求解器进入每一次迭代的经典优化：半波偶极子谐振搜索、9 参数 Yagi-Uda 逆向
   设计。
-- 已知答案真值校验与可复现基准（见 `docs/case_study_yagi.md`）。
+- 已知答案真值校验与可复现基准：半波偶极子（`scripts/verify_dipole.py`，NEC2）
+  与矩形微带贴片（`scripts/verify_patch.py`，openEMS —— 实测谐振频率与腔模解析
+  公式相差 3.1%）。另见 `docs/case_study_yagi.md`。
 - FastAPI 服务、Pydantic 领域模型，以及求解器 / AI 适配器接口。
 
 源序科技（Source Sequence）另行维护一个面向专业与商业用户的**增强版**（hosted /
@@ -262,9 +272,10 @@ commercial edition，内嵌网页平台）。为不夸大，以下能力均属**
 
 **规划中 / 路线图（当前尚不可用）**
 
-- full-wave 求解器接入（openEMS / HFSS / CST），覆盖贴片天线、微带阵列、超表面、
-  3D 结构。*（仓库内的 openEMS 适配器目前是解析降级占位，并非可用的 full-wave
-  路径，见 `docs/HONEST_STATUS.md`。）*
+- 更广的 full-wave 覆盖 —— 微带阵列、超表面、完整 3D 结构，以及商业求解器
+  （HFSS / CST / FEKO / COMSOL）。*（openEMS FDTD 后端现已是真实可用的，并通过
+  了一个贴片天线真值校验；更广的几何覆盖与商业求解器适配器仍在路线图上，见
+  `docs/HONEST_STATUS.md`。）*
 - 生成式 AI 几何设计（diffusion / VAE）接入真实物理 oracle。*（这些生成模型在
   仓库内目前仅为 **early / experimental** 代码：用合成几何训练、尚未接入仿真闭环，
   不是 production-ready。）*
