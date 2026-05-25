@@ -185,6 +185,45 @@ low/medium region, and never a final answer.**
   pattern is: surrogate for instant feedback and ranking → real NEC2 to confirm
   any design the user wants to keep.
 
+## Browser deployment (client-side inference)
+
+Because the model is tiny, it runs entirely in the browser with **no server, no
+ML runtime, and no third-party dependency** — a few thousand multiply-adds per
+prediction. Rather than ship ONNX Runtime Web (a multi-MB bundle to evaluate
+~5060 weights), the weights and normalization statistics are exported to plain
+JSON and a ~40-line hand-written forward pass does the work (see ADR-014).
+
+Reproduce the export with:
+
+```bash
+python3 scripts/export_surrogate_web.py
+node scripts/verify_web_surrogate.mjs    # JS-vs-PyTorch parity gate
+```
+
+Artifacts (in `frontend/`):
+
+| file | what |
+|------|------|
+| `surrogate_infer.js` | the forward pass (standardize → dense+ReLU layers → de-standardize); loadable as a browser global or a Node module, so one implementation backs both the page and the parity check |
+| `surrogate_yagi.web.json` | exported weights, normalization, input ranges, and a verification block of test inputs carrying the PyTorch model's own predictions |
+| `surrogate_demo_test.html` | self-contained page (engine + model + cases inlined) that re-runs every case in-browser, shows the JS-vs-PyTorch difference, and has a live slider predictor — opens from `file://`, no server |
+
+**Verification — JS matches PyTorch.** `scripts/verify_web_surrogate.mjs` runs the
+exported model through the JavaScript forward pass and compares every output to
+the PyTorch prediction baked into the export. Across 7 diverse designs (the
+optimized best, low/median/high-gain uniform samples, both box edges, and a
+textbook-like design — 28 outputs total):
+
+- **all 28 outputs within the 0.01 tolerance**, with **max |JS − PyTorch| = 9.4e-5**.
+- The residual is float32 (PyTorch) vs float64 (JS) rounding, not a logic
+  difference; normalization, weight layout, and layer order all line up.
+
+**Size and speed.** The weight JSON is ~166 KB raw / **~52 KB gzipped**; the
+demo page ~120 KB / ~54 KB gzipped. Inference measured in V8 (the same engine
+as Chrome) is **~8.7 µs per prediction (~115 k predictions/second)** — far faster
+than a slider can move, so a live "drag to see G_fwd / F/B / R / X" preview is
+comfortably real-time.
+
 ## Known limitations
 
 - **Domain.** Trained only on 5-element Yagis at 300 MHz within (and modestly

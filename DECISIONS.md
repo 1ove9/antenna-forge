@@ -50,6 +50,14 @@
 **Decision**: For the AI-module honesty pass, **sharpen `docs/HONEST_STATUS.md`** rather than half-wire the FNO surrogate into the optimization loop within the available budget.
 **Rationale**: A real FNO surrogate that genuinely speeds up the loop needs (a) thousands of NEC2 training samples covering the 9-D space, (b) careful train/val split + uncertainty calibration, and (c) an active-learning policy to decide when to trust the surrogate vs fall back to real NEC2. Half-doing that produces a "FNO-screened" loop that's actually slower than raw DE because of unreliable rejections. The honest move is to keep DE on real NEC2 (the current result already converges in seconds) and label the FNO module accurately as "implemented + trains on synthetic data but not yet wired into a real pipeline".
 
+## ADR-014: Yagi surrogate ships to the browser as JSON weights + hand-written JS forward pass, not ONNX
+**Decision**: The trained Yagi surrogate is exported to plain JSON (per-layer weight matrices, biases, and normalization statistics) and run in the browser with a ~40-line dependency-free JavaScript forward pass (`frontend/surrogate_infer.js`), rather than via ONNX Runtime Web / TensorFlow.js.
+**Rationale**:
+1. **Model is trivially small.** A 9→64→64→4 MLP is ~5060 weights. The exact forward pass is two ReLU dense layers plus a linear head — a few hundred lines of matrix arithmetic at most, with no operators that warrant a runtime.
+2. **No runtime download.** ONNX Runtime Web pulls a multi-MB WASM/JS bundle; the hand-written pass is a few KB of code over the ~52 KB-gzipped weight JSON. For a client-side slider preview, shipping a general inference engine to evaluate ~5000 multiply-adds is pure overhead.
+3. **Auditability and zero supply chain.** The whole inference path is readable in one file with no third-party dependency, and the same code runs in Node for the parity gate (`scripts/verify_web_surrogate.mjs`), so the browser numbers are checked against the source-of-truth PyTorch model in CI.
+4. **Verified parity.** JS vs PyTorch agree to `max |Δ| = 9.4e-5` across 7 diverse designs (including box edges), far inside the 0.01 acceptance tolerance; the residual is float32-vs-float64 rounding. If the model later grows operators that are painful to hand-write (conv stacks, attention), revisit ONNX then.
+
 ## Decision Log
 
 | Timestamp | Decision | Reason |
