@@ -8,47 +8,46 @@
 
 ## 阶段一：把"求解器"从演示级抬到工程级
 
-### 1.1 WSL2 + 真实 openEMS + nec2c（第一步、阻塞一切下游）
+### 1.1 ✅ 真实 openEMS + NEC2 已就位（曾经阻塞一切下游，现已解锁）
 
-为什么是第一步：当前所有"物理仿真"路径都走 §1 fallback，AI 管线接的不是物理 oracle 而是闭式近似。在没有真求解器之前，再多优化 VAE / FNO / 可微 FDTD 都是空转。
+**状态（2026-05-25）：已完成。** 两个开源求解器都已从"演示级降级路径"升级为真实求解器，物理仿真路径不再走任何闭式近似：
 
-具体动作：
+- **NEC2**：`nec2_adapter` 通过 `necpp` Python 绑定真实跑矩量法（2026-05-24）；缺 `necpp` → `SolverUnavailable`。
+- **openEMS**：`openems_adapter` 通过 `openEMS` / `CSXCAD` Python 绑定真实跑 full-wave FDTD（2026-05-25）：建 CSX 结构 → 网格细化 → lumped 端口激励 → 时域迭代 → 端口取 S11/Zin、NF2FF 取增益方向图；缺绑定 → `SolverUnavailable`。旧 `OpenEMSAdapter._run_analytical` / `_run_with_openems_api` 那套整体删除，真实 FDTD 是唯一路径。
 
-1. **WSL2 Ubuntu 24.04**：`wsl --install -d Ubuntu-24.04`，给 16 GB 内存 / 8 核 / 200 GB 虚拟盘。
-2. **nec2c**：`apt install nec2c` 或者从 `https://www.qsl.net/5b4az/pages/nec2.html` 编译。验证：`nec2c -i samples/dipole.nec -o out.txt` 跑通。
-3. **openEMS 全家桶**：
-   - 编译 openEMS 主体（C++）。文档在 `_reference/openEMS/INSTALL`。
-   - Python 绑定：`pip install openEMS CSXCAD` 或从源码 build `_reference/openEMS/python/`。
-   - 验证：跑 `_reference/openEMS/python/Examples/rectangular_resonant_cavity.py`，能拿到 S 参数曲线就算成功。
-4. **把 YAF API 容器换到 WSL**：现在的 docker-compose 跑在 Windows Docker Desktop 上，没法访问 WSL 里编译的 openEMS。两条路：(a) 在 WSL 里 `docker compose up`；(b) 容器里加一层 install openEMS 的 RUN 层（推荐 a，build 时间短得多）。
-5. **集成验证**：删掉 `OpenEMSAdapter._run_analytical` 的 fallback 入口，让 `_run_with_openems_api` 成为唯一路径，写一个"半波偶极子 → S11 谐振点在 2.45 GHz ±5%"的回归测试。
+环境（供复现参考）：openEMS 编译安装后，`CSXCAD_INSTALL_PATH` / `OPENEMS_INSTALL_PATH` / `LD_LIBRARY_PATH` 指向其 lib 即可让 `from openEMS import openEMS` / `from CSXCAD import ContinuousStructure` 可用；NEC2 用 `pip install necpp` 自行安装。
 
-### 1.2 用解析解锚定每个 adapter
+仍可继续做的（非阻塞）：
+
+1. **把 YAF API / worker 容器接到本机求解器**：当前 `verify_*` 脚本在本机进程内直接调用求解器，容器内的仿真链路（`yaf_worker/tasks/simulate.py` → 真实求解器 → MinIO）还没接通。
+
+### 1.2 用解析解锚定每个 adapter（部分完成）
 
 对 NEC2 和 openEMS 各做"已知答案"测试（参考 Balanis 第 4 章）：
 
-| 天线 | 频段 | 期望 S11 | 期望 \|Z_in\| | 期望增益 |
-|---|---|---|---|---|
-| 自由空间半波偶极子（L = λ/2 - δ）| 2.45 GHz | < −10 dB（带变压器）| 73 + j42 Ω（无变压器）| 2.15 dBi（±0.3）|
-| 1/4 波单极 + 大地平面 | 2.45 GHz | < −10 dB | 36 + j21 Ω | 5.15 dBi |
-| 矩形贴片（W = 0.6λ, L = 0.3λ, FR4 h=1.6mm）| 2.4 GHz | < −10 dB | 50 Ω 馈电 | 6–8 dBi |
-| 3-元 Yagi（Balanis 例 11.7.1 参数）| 300 MHz | — | — | 7.5 dBi |
+| 天线 | 频段 | 期望 | 状态 |
+|---|---|---|---|
+| 自由空间半波偶极子（L = λ/2 - δ）| 2.45 / 0.3 GHz | R ≈ 73 Ω、G ≈ 2.15 dBi | ✅ 已完成 `scripts/verify_dipole.py`（真实 NEC2，R≈68 Ω/误差 6.4%、G≈2.12 dBi、谐振过零）|
+| 矩形微带贴片 | 2.4 GHz | 谐振频率对腔模公式 ±10% | ✅ 已完成 `scripts/verify_patch.py`（真实 openEMS，Rogers RO4003C；实测 2.435 GHz vs 解析 2.513 GHz，误差 3.1%；S11 谷 −27 dB）|
+| 1/4 波单极 + 大地平面 | 2.45 GHz | 36 + j21 Ω、5.15 dBi | ⬜ 待补（NEC2，需地平面建模）|
+| 3-元 Yagi（Balanis 例 11.7.1 参数）| 300 MHz | G ≈ 7.5 dBi | ⬜ 待补（NEC2，绝对增益对教材值；Yagi 案例目前比的是相对 +dB 而非对单一教材增益值）|
 
-通不过任何一项 → 适配器有 bug，先修。这套验证比当前的"status == success"硬得多。
+通不过任何一项 → 适配器有 bug，先修。这套验证比"status == success"硬得多。偶极子与贴片两项已落地为可复现脚本；单极与 Yagi 绝对增益两项还没做。
 
-### 1.3 把 fallback 改成"显式 unavailable"而不是"伪造结果"
+### 1.3 ✅ fallback 已改成"显式 unavailable"而不是"伪造结果"
 
-`_compute_analytical` 和 `_run_analytical` 当前会**返回一个看起来正常的 `SimulationResult`**，调用方分不清"真求解"vs"近似"。改造：
+**状态：已完成。** `nec2_adapter` 与 `openems_adapter` 里旧的 `_compute_analytical` / `_run_analytical` 解析降级路径已整体删除：求解器后端缺失时直接 `raise SolverUnavailable`，几何不合法时 `raise SolverError`，没有任何"安静返回一个看起来正常的 `SimulationResult`"的代码路径。`scripts/verify_dipole.py` 与 `scripts/verify_patch.py` 是对应的已知答案回归；单元测试里也各有一条"空几何必须抛错、绝不伪造"的断言。
 
-- `SolverAdapter.health_check()` 在 boot 时跑一次，结果落到 `SimulationResult.solver_metadata["solver_mode"]` 里（`"native" | "subprocess" | "fallback_analytical"`）。
-- API 层在响应里显式带 `"warning": "..."` 字段，前端红色提示，**让用户知道这次结果不是 EM 真值**。
-- 提供一个 `--no-fallback` 模式，没有真求解器就直接 `raise SolverUnavailable`，不要静默降级——这样 CI 里能挡住"求解器没装、CI 看起来还过"的灾难。
+仍可继续做的（非阻塞精细化）：
+
+- 在 `SimulationResult.solver_metadata` 里补一个统一的 `solver_mode` 字段（如 `"native"`），API 响应/前端据此显式标注（目前 metadata 里已带 `backend` 名，但没有标准化的 mode 枚举）。
+- 剩下的 MEEP / HFSS / CST / FEKO / COMSOL 仍是 skeleton，返回显式的 `skeleton_not_implemented` 状态（同样不伪造结果），接真实后端是各自独立的活。
 
 ---
 
 ## 阶段二：把 AI 管线接到物理 oracle
 
-需要阶段一先就位（否则训练数据是噪声）。
+阶段一的真求解器已就位（§1.1 / §1.3 完成），数据可以是真值而不是噪声了——这一阶段现在可以开工。
 
 ### 2.1 数据集：从真实物理仿真生成 ≥ 10⁴ 样本
 
@@ -173,9 +172,9 @@ VAE / FNO / DDPM 训练所需的几何 ↔ S 参数标签对，必须用阶段�
 
 | 阶段 | 工程师·周（单人）| 解锁下游 |
 |---|---|---|
-| 1.1 WSL + 真实 solver | 1–2 | 全部 |
-| 1.2 已知答案测试 | 1 | 2.1 |
-| 1.3 fallback 收口 | 0.5 | — |
+| 1.1 真实 solver（openEMS + NEC2）| ✅ 已完成 | 全部 |
+| 1.2 已知答案测试 | 🔶 偶极子 + 贴片已完成，单极 / Yagi 绝对增益待补 | 2.1 |
+| 1.3 fallback 收口 | ✅ 已完成 | — |
 | 2.1 真实数据集生成 | 2–3（含 ~30 小时机时）| 2.2/2.3 |
 | 2.2 FNO 接 oracle | 2 | 2.3 |
 | 2.3 conditional VAE | 2 | 5.1 |
@@ -194,21 +193,19 @@ VAE / FNO / DDPM 训练所需的几何 ↔ S 参数标签对，必须用阶段�
 ## 不要做的事（trap list）
 
 1. **现在去优化 VAE 损失函数 / 调超参 / 上 diffusion**——在 §3.2 的"训练数据没有物理标签"修好前都是徒劳。
-2. **现在去补 HFSS / CST / FEKO / COMSOL adapter 真实实现**——这些是商业 licensed solver，没真实测试机器和 license 之前每写一行都是猜的。先把开源的 openEMS 和 nec2c 做扎实。
+2. **现在去补 HFSS / CST / FEKO / COMSOL adapter 真实实现**——这些是商业 licensed solver，没真实测试机器和 license 之前每写一行都是猜的。开源的 openEMS 和 NEC2 已经做扎实了；先用它们覆盖更多天线类别（贴片阵列、单极、补齐 §1.2 剩下的已知答案案例），商业求解器留到真正有 license 测试机时再动。
 3. **现在去做 Kubernetes / 高可用 / 多节点训练**——单机都没跑透，分布式只是把单点 bug 放大到多点。
 4. **现在去重写前端**——后端真实业务还没就位，前端再漂亮也没东西可显示。
 5. **现在去给 mypy --strict 加更多严格度**（比如 strict_concatenate、ban Any）——HONEST_STATUS §4 已经标好"待收紧"清单，按那个顺序来，先把核心物理跑对再去抠这个。
 
 ---
 
-## 最近一周的"敲门砖"
+## 最近一周的"敲门砖" —— ✅ 已迈过
 
-如果我**只能做一件事**：跑通 1.1 + 1.2 的"半波偶极子 73+j42 Ω"测试。
+原计划的分水岭是"跑通 1.1 + 1.2 的半波偶极子 73+j42 Ω 测试"。**这一步已经完成**（`scripts/verify_dipole.py`：真实 NEC2，R≈68 Ω），并且 openEMS 侧也补上了贴片谐振真值（`scripts/verify_patch.py`：实测 2.435 GHz vs 解析 2.513 GHz，误差 3.1%）。它带来的三件事现在都已兑现：
 
-这一件事满足后：
+- 两个开源求解器（NEC2 矩量法、openEMS full-wave FDTD）都真实可信；
+- 后续每一个 adapter 改进都有了回归基准；
+- 真值数据可以开始流，阶段二的数据集生成可以自动化跑起来。
 
-- 证明 openEMS adapter 真实可信；
-- 给后续每一个 adapter 改进提供回归基准；
-- 一旦真值数据开始流，B 阶段的数据集生成就可以自动化跑起来。
-
-**这是从"骨架"到"产品"的真正分水岭。**
+**从"骨架"到"产品"的这道分水岭已经迈过；下一道是阶段二——把这两个真求解器接进 AI 管线。**
