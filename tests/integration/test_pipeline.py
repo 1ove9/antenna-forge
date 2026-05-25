@@ -56,17 +56,59 @@ def test_solver_nec2_integration():
 
 
 def test_solver_openems_integration():
-    """Integration: run openEMS solver and verify result structure."""
-    import uuid
+    """Integration: run openEMS FDTD on a small microstrip patch.
+
+    Real full-wave run (no analytical fallback); skipped when the openEMS
+    Python bindings are not importable.
+    """
+    import math
+
+    import numpy as np
+    import pytest
+
+    try:
+        from openEMS import openEMS  # noqa: F401
+        from CSXCAD import ContinuousStructure  # noqa: F401
+    except Exception:
+        pytest.skip("openEMS Python bindings not installed")
+
     from yaf_core.domain.geometry import Geometry
     from yaf_core.domain.simulation import SimulationSpec
     from yaf_solvers.openems_adapter.adapter import OpenEMSAdapter
 
+    eps0 = 8.8541878128e-12
+    sub_t = 1.524
+    kappa = 1e-3 * 2 * math.pi * 2.45e9 * eps0 * 3.38
+    structures = [
+        {"kind": "metal", "name": "patch", "start": [-16, -20, sub_t],
+         "stop": [16, 20, sub_t], "priority": 10, "add_edges": "xy",
+         "metal_edge_res": True},
+        {"kind": "material", "name": "substrate", "epsilon": 3.38, "kappa": kappa,
+         "start": [-30, -30, 0], "stop": [30, 30, sub_t], "priority": 0},
+        {"kind": "metal", "name": "gnd", "start": [-30, -30, 0],
+         "stop": [30, 30, 0], "priority": 10, "add_edges": "xy"},
+    ]
+    spec = SimulationSpec(
+        frequency_range=(1e9, 3e9),
+        frequency_points=21,
+        solver_settings={
+            "unit": 1e-3,
+            "resolution": 15,
+            "air_box": {"x": [-100, 100], "y": [-100, 100], "z": [-50, 100]},
+            "extra_mesh_lines": {"z": list(np.linspace(0, sub_t, 5))},
+            "structures": structures,
+            "ports": [{"nr": 1, "R": 50.0, "start": [-6, 0, 0],
+                       "stop": [-6, 0, sub_t], "dir": "z", "excite": 1.0,
+                       "priority": 5, "edges2grid": "xy"}],
+            "nf2ff_center": [0, 0, 1e-3],
+        },
+    )
     adapter = OpenEMSAdapter()
     geom = Geometry()
-    spec = SimulationSpec(frequency_range=(2.4e9, 2.5e9), frequency_points=21)
     mesh = asyncio.run(adapter.mesh(geom, spec))
     result = asyncio.run(adapter.solve(mesh, spec))
     assert result.status == "success"
-    if result.s_params:
-        assert len(result.s_params.frequency) == 21
+    assert result.s_params is not None
+    assert len(result.s_params.frequency) == 21
+    assert result.gain_dbi is not None
+    assert result.solver_metadata["backend"] == "openEMS-python"

@@ -52,6 +52,22 @@ class TestOpenEMSAdapter:
         xml = adapter.to_native_format(geom)
         assert b"ContinuousStructure" in xml
 
+    def test_empty_geometry_does_not_fake(self):
+        """No silent analytical fallback: empty geometry must raise, not fabricate.
+
+        Raises SolverUnavailable when openEMS is absent, or SolverError when it
+        is present but no structures/ports were supplied — never a fake success.
+        """
+        import pytest
+        from yaf_solvers.base import YAFError
+        from yaf_solvers.openems_adapter.adapter import OpenEMSAdapter
+        adapter = OpenEMSAdapter()
+        geom = Geometry()
+        spec = SimulationSpec(frequency_range=(2.4e9, 2.5e9))
+        mesh = asyncio.run(adapter.mesh(geom, spec))
+        with pytest.raises(YAFError):
+            asyncio.run(adapter.solve(mesh, spec))
+
 
 class TestNEC2Adapter:
     def test_capabilities(self):
