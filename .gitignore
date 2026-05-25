@@ -78,7 +78,6 @@ qdrant-data/
 redis-data/
 
 # --- Misc ---
-test_write.txt
 *.tmp
 *.bak
 

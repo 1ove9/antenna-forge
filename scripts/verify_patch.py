@@ -77,7 +77,7 @@ def analytical_resonance() -> tuple[float, float, float]:
     return f_res, eps_eff, dL * 1e3
 
 
-def build_spec() -> SimulationSpec:
+def patch_simulation_spec() -> SimulationSpec:
     kappa = LOSS_TAN * 2 * math.pi * DESIGN_F * EPS0 * EPS_R
     sub_t = SUB_H_MM
     sub_half = 30.0  # substrate / ground half-extent (mm)
@@ -130,7 +130,7 @@ def main() -> int:
     print()
 
     adapter = OpenEMSAdapter()
-    spec = build_spec()
+    spec = patch_simulation_spec()
     geom = Geometry(name="ro4003_patch")
     try:
         mesh = asyncio.run(adapter.mesh(geom, spec))
