@@ -6581,7 +6581,10 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
-    camera.position.set(6.2, 3.4, 7.6);
+    // three-quarter product-shot framing: looking down ~28° from above and
+    // offset to the side so the boom recedes with perspective and the array
+    // reads as a 3D structure rather than a flat comb of vertical lines.
+    camera.position.set(5.6, 5.0, 7.4);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -6618,19 +6621,22 @@
     scene.add(new THREE.AmbientLight(0x2a3038, 0.55));
     const hemi = new THREE.HemisphereLight(0x9fb4c0, 0x0a0e14, 0.4);
     scene.add(hemi);
-    // key — stronger and whiter so the polished silver throws sharp highlights
+    // key — stronger and whiter so the polished silver throws sharp highlights.
+    // Placed almost directly overhead so the vertical elements drop short,
+    // soft contact shadows (a studio look) instead of long streaks that read
+    // as confusing inverted lines on the floor.
     const key = new THREE.DirectionalLight(0xeef4fa, 1.5);
-    key.position.set(6, 10, 6);
+    key.position.set(2, 13, 2.5);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.camera.near = 1;
     key.shadow.camera.far = 40;
-    key.shadow.camera.left = -7;
-    key.shadow.camera.right = 7;
-    key.shadow.camera.top = 7;
-    key.shadow.camera.bottom = -7;
+    key.shadow.camera.left = -6;
+    key.shadow.camera.right = 6;
+    key.shadow.camera.top = 6;
+    key.shadow.camera.bottom = -6;
     key.shadow.bias = -0.0004;
-    key.shadow.radius = 3;
+    key.shadow.radius = 9;
     scene.add(key);
     // very faint cyan rim — edge interest only, never the dominant accent
     const fill = new THREE.DirectionalLight(0x4fd6c8, 0.2);
