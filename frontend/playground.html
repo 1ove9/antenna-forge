@@ -6764,7 +6764,7 @@
         ctx.stroke();
         const dbLabel = -RANGE_DB * (1 - k / 4); // outer ring = 0 dB
         if (k > 0) {
-          ctx.fillStyle = "rgba(69,78,88,0.9)";
+          ctx.fillStyle = "rgba(139,146,168,0.55)";
           ctx.fillText((dbLabel === 0 ? "0" : dbLabel.toFixed(0)) + " dB", cx + 5, cy - rr + 13);
         }
       }
@@ -6778,7 +6778,7 @@
         ctx.stroke();
       }
       // cardinal labels (forward = top)
-      ctx.fillStyle = "rgba(107,118,130,0.8)";
+      ctx.fillStyle = "rgba(139,146,168,0.85)";
       ctx.font = "400 10px 'JetBrains Mono', monospace";
       ctx.textAlign = "center";
       ctx.fillText("FWD 0°", cx, cy - R - 16);
@@ -6803,14 +6803,17 @@
       }
       ctx.closePath();
       const grad = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
-      grad.addColorStop(0, "rgba(79,214,200,0.16)");
-      grad.addColorStop(1, "rgba(79,214,200,0.015)");
+      grad.addColorStop(0, "rgba(77,124,255,0.20)");
+      grad.addColorStop(1, "rgba(77,124,255,0.02)");
       ctx.fillStyle = grad;
       ctx.fill();
-      ctx.lineWidth = 1.6;
-      ctx.strokeStyle = "rgba(79,214,200,0.9)";
-      ctx.shadowColor = "rgba(79,214,200,0.55)";
-      ctx.shadowBlur = 12;
+      // Curve lift on a deep-blue field: a cyan-assisted glow under a
+      // brightened electric-blue stroke keeps the trace crisp (blue-on-blue
+      // would otherwise wash out relative to the old teal-on-near-black).
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = "rgba(125,162,255,0.96)";
+      ctx.shadowColor = "rgba(6,182,212,0.5)";
+      ctx.shadowBlur = 14;
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
@@ -6858,7 +6861,7 @@
     // Fog tinted to the inner-panel colour so the (large) ground plane fades
     // smoothly into the background instead of ending on a hard black edge.
     // near is past the array so the elements stay crisp.
-    scene.fog = new THREE.Fog(0x10151c, 15, 60);
+    scene.fog = new THREE.Fog(0x1a2238, 15, 60);
     const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
     // three-quarter product-shot framing: looking down ~28° from above and
     // offset to the side so the boom recedes with perspective and the array
@@ -6900,7 +6903,7 @@
 
     // lighting — restrained, lab-instrument feel
     scene.add(new THREE.AmbientLight(0x2a3038, 0.55));
-    const hemi = new THREE.HemisphereLight(0x9fb4c0, 0x0a0e14, 0.4);
+    const hemi = new THREE.HemisphereLight(0x9fb4c0, 0x0a0e1a, 0.4);
     scene.add(hemi);
     // key — stronger and whiter so the polished silver throws sharp highlights.
     // Placed almost directly overhead so the vertical elements drop short,
@@ -6919,8 +6922,8 @@
     key.shadow.bias = -0.0004;
     key.shadow.radius = 9;
     scene.add(key);
-    // very faint cyan rim — edge interest only, never the dominant accent
-    const fill = new THREE.DirectionalLight(0x4fd6c8, 0.2);
+    // electric-blue rim — edge interest only, never the dominant accent
+    const fill = new THREE.DirectionalLight(0x4d7cff, 0.22);
     fill.position.set(-7, -2, -5);
     scene.add(fill);
 
@@ -6937,7 +6940,7 @@
     const BOOM_COLOR    = 0xb6bec6;   // boom — slightly darker silver
     // Floor: very low-saturation dark grey-blue, one step brighter than the
     // #10151c inner panel so the lighting ladder climbs bg < panel < floor.
-    const FLOOR_COLOR   = 0x161c24;
+    const FLOOR_COLOR   = 0x151c30;
 
     // shared metal material for elements — high metalness, low roughness so
     // highlights stay tight and the silver looks polished, not matte.
@@ -6946,7 +6949,7 @@
     });
     const drivenMetal = new THREE.MeshStandardMaterial({
       color: DRIVEN_COLOR, metalness: 0.92, roughness: 0.22,
-      emissive: 0x123733, emissiveIntensity: 0.3,   // faint cyan to mark it
+      emissive: 0x1a3066, emissiveIntensity: 0.32,   // faint electric-blue mark
     });
     const boomMat = new THREE.MeshStandardMaterial({
       color: BOOM_COLOR, metalness: 0.9, roughness: 0.34,
