@@ -77,6 +77,40 @@
     line-height: 1.5;
   }
   .brand .sub .mark { color: var(--accent); }
+
+  /* inline glossary term (e.g. NEC2) — dotted underline + restrained tooltip */
+  .term {
+    position: relative;
+    border-bottom: 1px dotted var(--accent-dim);
+    cursor: help;
+    outline: none;
+  }
+  .term .tip {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 9px);
+    width: 290px;
+    max-width: 78vw;
+    background: #0b1018;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 11px 13px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 300;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+    color: var(--txt-dim);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transform: translateY(-3px);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    z-index: 20;
+  }
+  .term .tip b { color: var(--txt); font-weight: 500; }
+  .term:hover .tip, .term:focus-visible .tip { opacity: 1; transform: translateY(0); }
+
   .head-meta {
     font-family: var(--mono);
     font-size: 10.5px;
@@ -430,6 +464,22 @@
   footer .about b { color: var(--txt); font-weight: 500; }
   footer .about .mono { font-family: var(--mono); font-size: 11px; color: var(--txt); }
   footer .about .accent { color: var(--accent); }
+  footer .about a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent-dim);
+    transition: border-color 0.25s ease, color 0.25s ease;
+  }
+  footer .about a:hover { border-color: var(--accent); }
+  footer .about .src {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 11px;
+    color: var(--txt-faint);
+    letter-spacing: 0.02em;
+  }
+  footer .about .src .mono { font-size: 10.5px; }
   footer .colophon {
     margin-top: 26px;
     font-family: var(--mono);
@@ -473,12 +523,14 @@
       <div class="sub">
         Real-time exploration of a five-element Yagi–Uda array. Geometry and
         performance update live through a neural surrogate trained on
-        <span class="mark">real NEC2 simulations</span>.
+        <span class="mark">real <span class="term" tabindex="0">NEC2<span class="tip"><b>NEC2</b> — Numerical Electromagnetics Code, a method-of-moments solver for wire-antenna modelling.</span></span> simulations</span>.
       </div>
     </div>
     <div class="head-meta">
       <div>MODEL&nbsp;&nbsp;<b>9&nbsp;→&nbsp;4 MLP</b></div>
       <div>TRAIN&nbsp;&nbsp;<b>10,898 NEC2 runs</b></div>
+      <div>TEST&nbsp;&nbsp;<b>R² 0.90–0.96</b></div>
+      <div>INFER&nbsp;&nbsp;<b>&lt;&nbsp;1&nbsp;ms / eval</b></div>
       <div>FREQ&nbsp;&nbsp;<b>normalized to λ</b></div>
     </div>
   </header>
@@ -562,6 +614,13 @@
           Outputs are forward gain (dBi), front-to-back ratio (dB) and the
           feed-point impedance R + jX (Ω).
         </p>
+        <div class="src">
+          Source, training pipeline and methodology are public —
+          <a href="https://github.com/1ove9/antenna-forge" target="_blank" rel="noopener">github.com/1ove9/antenna-forge</a>.
+          For the data generation, surrogate architecture and evaluation
+          protocol, see the
+          <a href="https://github.com/1ove9/antenna-forge#readme" target="_blank" rel="noopener">methodology&nbsp;notes&nbsp;→</a>.
+        </div>
       </div>
     </details>
     <div class="colophon">
