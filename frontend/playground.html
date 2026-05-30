@@ -412,31 +412,31 @@
   .actions .opt-caption b { color: var(--txt); font-weight: 500; }
   button.optimize {
     appearance: none;
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent-dim);
+    background: var(--cta);
+    color: #f5f7fa;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 3px;
     padding: 15px 18px;
     font-family: var(--sans);
     font-size: 12px;
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 0.28em;
     text-transform: uppercase;
     cursor: pointer;
+    box-shadow: 0 0 24px 0 var(--cta-glow);
     transition: background 0.35s ease, box-shadow 0.35s ease,
-      border-color 0.35s ease, color 0.35s ease;
+      border-color 0.35s ease, color 0.35s ease, opacity 0.35s ease;
     position: relative;
     overflow: hidden;
   }
   button.optimize:hover {
-    background: rgba(79, 214, 200, 0.05);
-    box-shadow: 0 0 22px 0 var(--accent-glow);
-    border-color: var(--accent);
+    box-shadow: 0 0 30px 2px var(--cta-glow-strong);
+    border-color: rgba(255, 255, 255, 0.24);
   }
-  button.optimize:disabled { cursor: default; color: var(--accent-dim); }
+  button.optimize:disabled { cursor: default; opacity: 0.75; }
   button.optimize.running {
-    border-color: var(--accent);
-    box-shadow: 0 0 18px 0 var(--accent-glow);
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 0 30px 2px var(--cta-glow-strong);
   }
   .reset {
     background: none;
@@ -479,7 +479,7 @@
     transition: color 0.28s ease, border-color 0.28s ease, background 0.28s ease;
   }
   button.chip:hover { color: var(--txt); border-color: var(--line); background: rgba(255, 255, 255, 0.02); }
-  button.chip.sel { color: var(--accent); border-color: var(--accent-dim); }
+  button.chip.sel { color: var(--accent); border-color: var(--accent-dim); background: var(--sel); }
 
   .util-row {
     display: flex;
@@ -504,14 +504,25 @@
     transition: color 0.28s ease, border-color 0.28s ease;
   }
   button.util:hover { color: var(--txt-dim); border-color: var(--line); }
-  button.util.ok { color: var(--accent); border-color: var(--accent-dim); }
+  button.util.ok { color: var(--accent); border-color: var(--accent-dim); background: var(--sel); }
 
   /* AI-Optimize breathing hint (until first interaction) */
   @keyframes optpulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 214, 200, 0); }
-    50% { box-shadow: 0 0 20px 0 var(--accent-glow); }
+    0%, 100% { box-shadow: 0 0 18px 0 var(--cta-glow); }
+    50% { box-shadow: 0 0 34px 3px var(--cta-glow-strong); }
   }
   button.optimize.hinting { animation: optpulse 2.6s ease-in-out infinite; }
+
+  /* electric-blue focus ring */
+  button:focus-visible,
+  a:focus-visible,
+  .term:focus-visible,
+  summary:focus-visible,
+  input[type="range"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
   @media (prefers-reduced-motion: reduce) {
     button.optimize.hinting { animation: none; }
   }
@@ -541,13 +552,17 @@
     letter-spacing: 0.08em;
     color: var(--txt-faint);
   }
+  @keyframes dotpulse {
+    0%, 100% { opacity: 0.25; box-shadow: 0 0 0 0 var(--accent-glow); }
+    50% { opacity: 1; box-shadow: 0 0 8px 1px var(--accent-glow); }
+  }
   #viewport .loading::after {
     content: "";
     width: 5px; height: 5px;
     margin-left: 9px;
     border-radius: 50%;
-    background: var(--accent-dim);
-    animation: optpulse 1.6s ease-in-out infinite;
+    background: var(--accent);
+    animation: dotpulse 1.6s ease-in-out infinite;
   }
 
   /* ---- footer / about ---- */
