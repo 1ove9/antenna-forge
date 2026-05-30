@@ -12,20 +12,36 @@
 />
 <style>
   :root {
-    --bg-0: #0a0e14;
-    --bg-1: #0d1117;
+    /* deep-space blue background ladder */
+    --bg-0: #0a0e1a;            /* page base — deep space, blue-black */
+    --bg-1: #131829;            /* cards / popovers / secondary surfaces */
+    --bg-2: #1a2238;            /* 3D showcase + canvas radial centre */
     --panel: rgba(255, 255, 255, 0.012);
-    --line: rgba(255, 255, 255, 0.06);
-    --line-soft: rgba(255, 255, 255, 0.035);
-    --txt: #c8d0d8;
-    --txt-dim: #6b7682;
-    --txt-faint: #454e58;
-    --accent: #4fd6c8;
-    --accent-dim: rgba(79, 214, 200, 0.5);
-    --accent-glow: rgba(79, 214, 200, 0.14);
+    --line: rgba(255, 255, 255, 0.08);          /* unified border */
+    --line-soft: rgba(255, 255, 255, 0.05);
+    /* text ladder — paper-white over cool blue-grey */
+    --txt: #f5f7fa;
+    --txt-dim: #8b92a8;
+    --txt-faint: rgba(139, 146, 168, 0.4);      /* weakest hint = #8b92a8 /40 */
+    --txt-mute: rgba(139, 146, 168, 0.7);       /* #8b92a8 /70 */
+    /* electric blue — the single vivid brand colour */
+    --accent: #4d7cff;
+    --accent-dim: rgba(77, 124, 255, 0.5);
+    --accent-glow: rgba(77, 124, 255, 0.18);
+    --cta: linear-gradient(135deg, #4d7cff 0%, #6366f1 100%);
+    --cta-glow: rgba(77, 124, 255, 0.4);
+    --cta-glow-strong: rgba(77, 124, 255, 0.55);
+    --ring: rgba(77, 124, 255, 0.5);            /* focus ring */
+    --sel: rgba(77, 124, 255, 0.25);            /* selection / selected state */
+    /* glass surfaces */
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-line: rgba(255, 255, 255, 0.1);
+    --pill: rgba(255, 255, 255, 0.04);
     --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
     --sans: "Inter", system-ui, -apple-system, sans-serif;
   }
+
+  ::selection { background: var(--sel); color: var(--txt); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -33,8 +49,8 @@
 
   body {
     background:
-      radial-gradient(1200px 800px at 70% -10%, #0e141d 0%, transparent 60%),
-      radial-gradient(900px 700px at 10% 110%, #0b1018 0%, transparent 55%),
+      radial-gradient(1200px 800px at 70% -10%, #141d33 0%, transparent 60%),
+      radial-gradient(900px 700px at 10% 110%, #0e1526 0%, transparent 55%),
       var(--bg-0);
     color: var(--txt);
     font-family: var(--sans);
@@ -91,8 +107,10 @@
     top: calc(100% + 9px);
     width: 290px;
     max-width: 78vw;
-    background: #0b1018;
-    border: 1px solid var(--line);
+    background: rgba(19, 24, 41, 0.72);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid var(--glass-line);
     border-radius: 4px;
     padding: 11px 13px;
     font-family: var(--sans);
@@ -148,8 +166,11 @@
     font-family: var(--mono);
     font-size: 9.5px;
     letter-spacing: 0.04em;
-    color: var(--txt-faint);
-    border: 1px solid var(--line);
+    color: var(--txt-dim);
+    background: var(--pill);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid var(--glass-line);
     border-radius: 2px;
     padding: 2px 6px;
     text-transform: none;
@@ -160,8 +181,8 @@
     height: 440px;
     margin-top: 16px;
     position: relative;
-    background: #10151c;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: radial-gradient(circle at 50% 38%, var(--bg-2) 0%, var(--bg-0) 80%);
+    border: 1px solid var(--line);
     border-radius: 4px;
   }
   #viewport canvas { display: block; border-radius: 3px; }
@@ -173,7 +194,9 @@
     font-size: 9.5px;
     letter-spacing: 0.05em;
     color: var(--txt-dim);
-    background: rgba(10, 14, 20, 0.55);
+    background: rgba(10, 14, 26, 0.5);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
     padding: 3px 8px;
     border-radius: 3px;
     pointer-events: none;
@@ -338,7 +361,7 @@
     height: 12px;
     margin-top: -5px;
     border-radius: 50%;
-    background: #0d1117;
+    background: var(--bg-1);
     border: 1.5px solid var(--accent-dim);
     box-shadow: 0 0 0 0 var(--accent-glow);
     transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
@@ -347,7 +370,7 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #0d1117;
+    background: var(--bg-1);
     border: 1.5px solid var(--accent-dim);
     box-shadow: 0 0 0 0 var(--accent-glow);
     transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
