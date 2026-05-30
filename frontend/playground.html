@@ -61,10 +61,23 @@
     letter-spacing: 0.01em;
   }
 
+  /* faint monochrome grain — softens colour banding on the deep-blue field */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   .shell {
     max-width: 1320px;
     margin: 0 auto;
     padding: 48px 40px 64px;
+    position: relative;
+    z-index: 1;
   }
 
   /* ---- header ---- */
@@ -631,6 +644,16 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  /* fade-ended hairline rules — bright at centre, transparent at the ends */
+  header, .stage, .readouts {
+    border-bottom: 1px solid transparent;
+    border-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08) 50%, transparent) 1;
+  }
+  footer {
+    border-top: 1px solid transparent;
+    border-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08) 50%, transparent) 1;
   }
 
   @media (max-width: 920px) {
