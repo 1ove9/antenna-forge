@@ -6574,6 +6574,8 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.setClearColor(0x000000, 0);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -6587,17 +6589,50 @@
     controls.minDistance = 5;
     controls.maxDistance = 18;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.55;
+    controls.autoRotateSpeed = 0.42;
     controls.target.set(0, 0, 0);
 
+    // Neutral gradient environment — gives the metal something to reflect so
+    // the polished silver actually reads as metal (bright top, dark
+    // underside) instead of a flat dark blob. Stays out of the background
+    // (scene.environment only), so the transparent panel still shows through.
+    (function buildEnv() {
+      const c = document.createElement("canvas");
+      c.width = 8; c.height = 64;
+      const cx = c.getContext("2d");
+      const g = cx.createLinearGradient(0, 0, 0, 64);
+      g.addColorStop(0.0, "#aeb8c2");   // "sky" — light grey
+      g.addColorStop(0.45, "#3c454f");
+      g.addColorStop(1.0, "#0b0f15");   // "ground" — dark
+      cx.fillStyle = g; cx.fillRect(0, 0, 8, 64);
+      const tex = new THREE.CanvasTexture(c);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromEquirectangular(tex).texture;
+      tex.dispose();
+      pmrem.dispose();
+    })();
+
     // lighting — restrained, lab-instrument feel
-    scene.add(new THREE.AmbientLight(0x2a3038, 1.0));
-    const hemi = new THREE.HemisphereLight(0x9fb4c0, 0x0a0e14, 0.55);
+    scene.add(new THREE.AmbientLight(0x2a3038, 0.55));
+    const hemi = new THREE.HemisphereLight(0x9fb4c0, 0x0a0e14, 0.4);
     scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xdfeaf2, 1.05);
+    // key — stronger and whiter so the polished silver throws sharp highlights
+    const key = new THREE.DirectionalLight(0xeef4fa, 1.5);
     key.position.set(6, 10, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 40;
+    key.shadow.camera.left = -7;
+    key.shadow.camera.right = 7;
+    key.shadow.camera.top = 7;
+    key.shadow.camera.bottom = -7;
+    key.shadow.bias = -0.0004;
+    key.shadow.radius = 3;
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0x4fd6c8, 0.22);
+    // very faint cyan rim — edge interest only, never the dominant accent
+    const fill = new THREE.DirectionalLight(0x4fd6c8, 0.2);
     fill.position.set(-7, -2, -5);
     scene.add(fill);
 
@@ -6606,24 +6641,34 @@
 
     const SCALE = 7.2;   // scene units per wavelength
 
-    // shared metal material for elements
+    // ---- tunable palette (edit here to retint the 3D scene) ----
+    // Polished light-silver alloy — low-saturation grey-white, not pure
+    // white. Reads as precision-instrument aluminium in the dark scene.
+    const ANTENNA_COLOR = 0xc8d0d8;   // parasitic elements + boom base tone
+    const DRIVEN_COLOR  = 0xd2dade;   // driven element — a touch brighter
+    const BOOM_COLOR    = 0xb6bec6;   // boom — slightly darker silver
+    // Floor: very low-saturation dark grey-blue, one step brighter than the
+    // #10151c inner panel so the lighting ladder climbs bg < panel < floor.
+    const FLOOR_COLOR   = 0x161c24;
+
+    // shared metal material for elements — high metalness, low roughness so
+    // highlights stay tight and the silver looks polished, not matte.
     const metal = new THREE.MeshStandardMaterial({
-      color: 0x3a424c, metalness: 0.92, roughness: 0.34,
-      emissive: 0x0c1a1a, emissiveIntensity: 0.18,
+      color: ANTENNA_COLOR, metalness: 0.94, roughness: 0.25,
     });
     const drivenMetal = new THREE.MeshStandardMaterial({
-      color: 0x46525c, metalness: 0.9, roughness: 0.3,
-      emissive: 0x123733, emissiveIntensity: 0.42,
+      color: DRIVEN_COLOR, metalness: 0.92, roughness: 0.22,
+      emissive: 0x123733, emissiveIntensity: 0.3,   // faint cyan to mark it
     });
     const boomMat = new THREE.MeshStandardMaterial({
-      color: 0x232a31, metalness: 0.85, roughness: 0.5,
+      color: BOOM_COLOR, metalness: 0.9, roughness: 0.34,
     });
 
-    // element radius ~ thin rod
-    const ELEM_R = 0.028;
-    const elemGeo = new THREE.CylinderGeometry(ELEM_R, ELEM_R, 1, 18);
+    // element radius — solid machined rod, not a hairline
+    const ELEM_R = 0.045;
+    const elemGeo = new THREE.CylinderGeometry(ELEM_R, ELEM_R, 1, 24);
     // boom along Z
-    const boomGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 20);
+    const boomGeo = new THREE.CylinderGeometry(0.075, 0.075, 1, 24);
 
     const elementDefs = [
       { Lp: "L_ref", mat: metal },
@@ -6634,13 +6679,26 @@
     ];
     const elements = elementDefs.map((d) => {
       const m = new THREE.Mesh(elemGeo, d.mat);
+      m.castShadow = true;
       group.add(m);
       // subtle end caps for a machined look
       return { mesh: m, Lp: d.Lp };
     });
     const boom = new THREE.Mesh(boomGeo, boomMat);
     boom.rotation.x = Math.PI / 2; // align cylinder axis to Z
+    boom.castShadow = true;
     group.add(boom);
+
+    // restrained ground plane — matte, low-saturation, catches a soft shadow
+    // so the array sits on a surface instead of floating in the void.
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: FLOOR_COLOR, metalness: 0.0, roughness: 0.95,
+    });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 34), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -2.3;
+    floor.receiveShadow = true;
+    scene.add(floor);
 
     function update(s) {
       // cumulative z positions along the boom
