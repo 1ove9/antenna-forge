@@ -424,6 +424,103 @@
   }
   .reset:hover { color: var(--txt-dim); }
 
+  /* ---- preset designs + utility actions ---- */
+  .presets { margin-top: 2px; }
+  .presets .plabel {
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--txt-faint);
+    font-weight: 400;
+    margin-bottom: 9px;
+  }
+  .presets .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  button.chip {
+    appearance: none;
+    background: transparent;
+    color: var(--txt-dim);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 6px 9px;
+    font-family: var(--sans);
+    font-size: 10.5px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: color 0.28s ease, border-color 0.28s ease, background 0.28s ease;
+  }
+  button.chip:hover { color: var(--txt); border-color: var(--line); background: rgba(255, 255, 255, 0.02); }
+  button.chip.sel { color: var(--accent); border-color: var(--accent-dim); }
+
+  .util-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+  button.util {
+    appearance: none;
+    background: transparent;
+    color: var(--txt-faint);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 7px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.28s ease, border-color 0.28s ease;
+  }
+  button.util:hover { color: var(--txt-dim); border-color: var(--line); }
+  button.util.ok { color: var(--accent); border-color: var(--accent-dim); }
+
+  /* AI-Optimize breathing hint (until first interaction) */
+  @keyframes optpulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 214, 200, 0); }
+    50% { box-shadow: 0 0 20px 0 var(--accent-glow); }
+  }
+  button.optimize.hinting { animation: optpulse 2.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    button.optimize.hinting { animation: none; }
+  }
+
+  /* first-visit one-liner above the sliders */
+  .first-hint {
+    grid-column: 1 / -1;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--txt-faint);
+    line-height: 1.5;
+    margin: -4px 0 2px;
+    transition: opacity 0.5s ease;
+  }
+  .first-hint .k { color: var(--txt-dim); }
+  .first-hint.gone { opacity: 0; }
+
+  /* 3D loading state */
+  #viewport .loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--txt-faint);
+  }
+  #viewport .loading::after {
+    content: "";
+    width: 5px; height: 5px;
+    margin-left: 9px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    animation: optpulse 1.6s ease-in-out infinite;
+  }
+
   /* ---- footer / about ---- */
   footer {
     margin-top: 54px;
@@ -541,6 +638,7 @@
         Array Geometry <span class="tag">live · 5 elements</span>
       </div>
       <div id="viewport">
+        <div class="loading" id="vp-loading">initializing renderer</div>
         <div class="hint">drag to orbit · auto-rotating</div>
         <div class="nofx" id="nofx">
           3D viewport needs the Three.js library (loaded from CDN).<br />
@@ -566,7 +664,11 @@
   <section class="readouts" id="readouts"><!-- filled by JS --></section>
 
   <section class="controls">
-    <div class="sliders" id="sliders"><!-- filled by JS --></div>
+    <div class="sliders" id="sliders">
+      <div class="first-hint" id="first-hint">
+        <span class="k">Drag any slider</span> for instant surrogate feedback, or
+        <span class="k">AI Optimize</span> to converge on the best design.
+      </div><!-- sliders filled by JS --></div>
     <div class="actions">
       <div class="opt-caption">
         Search the design space for the configuration the surrogate rates
@@ -574,7 +676,18 @@
         recovered from the NEC2 data.
       </div>
       <button class="optimize" id="optimize">AI Optimize</button>
-      <button class="reset" id="reset">Reset</button>
+      <div class="presets">
+        <div class="plabel">Load a design</div>
+        <div class="chips">
+          <button class="chip" data-preset="viezbicke">Textbook · Viezbicke</button>
+          <button class="chip" data-preset="optimized">AI optimized</button>
+          <button class="chip" data-preset="midrange">Mid-range</button>
+        </div>
+      </div>
+      <div class="util-row">
+        <button class="util" id="export">Export</button>
+        <button class="util" id="share">Copy link</button>
+      </div>
     </div>
   </section>
 
@@ -6412,7 +6525,25 @@
 
   // ---- state -------------------------------------------------------------
   const state = {};   // current param values (physical units, λ)
-  PARAMS.forEach((p) => { const [lo, hi] = RANGES[p]; state[p] = (lo + hi) / 2; });
+  const MID = {};     // mid-range reference (also the "Reset" target)
+  PARAMS.forEach((p) => { const [lo, hi] = RANGES[p]; state[p] = MID[p] = (lo + hi) / 2; });
+
+  function clampParam(p, v) {
+    const [lo, hi] = RANGES[p];
+    return Math.min(hi, Math.max(lo, v));
+  }
+
+  // Restore a shared design from URL query params (?L_ref=…&s_d3=…). Values
+  // are clamped to the trained range so a hand-edited link can never push the
+  // surrogate outside the space it was fit on.
+  (function loadFromURL() {
+    const q = new URLSearchParams(window.location.search);
+    PARAMS.forEach((p) => {
+      if (!q.has(p)) return;
+      const v = parseFloat(q.get(p));
+      if (isFinite(v)) state[p] = clampParam(p, v);
+    });
+  })();
 
   function predict() {
     const x = PARAMS.map((p) => state[p]);
@@ -6479,6 +6610,8 @@
         input.value = state[p];
         vEl.textContent = state[p].toFixed(3);
         const onInput = () => {
+          firstInteraction();
+          clearPresetSelection();
           state[p] = parseFloat(input.value);
           vEl.textContent = state[p].toFixed(3);
           wrap.classList.add("active");
@@ -6626,12 +6759,22 @@
   //  3D viewport (Three.js)
   // ======================================================================
   let scene3d = null;
+  function fail3d() {
+    const loading = document.getElementById("vp-loading");
+    const hint = document.querySelector("#viewport .hint");
+    if (loading) loading.style.display = "none";
+    if (hint) hint.style.display = "none";
+    document.getElementById("nofx").style.display = "flex";
+  }
   (function init3d() {
     const host = document.getElementById("viewport");
-    if (typeof THREE === "undefined") {
-      document.getElementById("nofx").style.display = "flex";
+    if (typeof THREE === "undefined" || typeof THREE.OrbitControls === "undefined") {
+      fail3d();
       return;
     }
+    const loading = document.getElementById("vp-loading");
+    if (loading) loading.style.display = "none";
+    try {
     const W = host.clientWidth, H = host.clientHeight;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -6818,56 +6961,185 @@
 
     scene3d = { update, render };
     update(state);
+    } catch (e) {
+      scene3d = null;
+      fail3d();
+    }
   })();
 
   // ======================================================================
-  //  AI Optimize — eased convergence to the optimized design
+  //  First-interaction hint dismissal
+  // ======================================================================
+  let interacted = false;
+  function firstInteraction() {
+    if (interacted) return;
+    interacted = true;
+    optBtn.classList.remove("hinting");
+    const fh = document.getElementById("first-hint");
+    if (fh) fh.classList.add("gone");
+  }
+
+  // ======================================================================
+  //  Eased transitions — AI Optimize and the named presets share one engine
   // ======================================================================
   const optBtn = document.getElementById("optimize");
   let animating = false;
 
   function easeInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
-  let optStart = null;
-  function runOptimize() {
+  // Classic five-element NBS / Viezbicke (TN 688) design, in wavelengths —
+  // a textbook reference to contrast against the AI-optimized solution.
+  const VIEZBICKE = {
+    L_ref: 0.482, L_drv: 0.475, L_d1: 0.442, L_d2: 0.438, L_d3: 0.434,
+    s_ref: 0.20, s_d1: 0.20, s_d2: 0.25, s_d3: 0.25,
+  };
+  const PRESETS = { viezbicke: VIEZBICKE, optimized: OPT, midrange: MID };
+  Object.values(PRESETS).forEach((d) => PARAMS.forEach((p) => { d[p] = clampParam(p, d[p]); }));
+
+  let animStart = null;
+  function animateTo(dest, onDone) {
     if (animating) return;
     animating = true;
-    optBtn.classList.add("running");
-    optBtn.textContent = "Optimizing…";
-    optBtn.disabled = true;
+    firstInteraction();
     const from = {};
     PARAMS.forEach((p) => { from[p] = state[p]; });
-    const DURATION = 2600;
-    optStart = null;
-
+    const DURATION = 2200;
+    animStart = null;
     function step(ts) {
-      if (optStart === null) optStart = ts;
-      let t = (ts - optStart) / DURATION;
+      if (animStart === null) animStart = ts;
+      let t = (ts - animStart) / DURATION;
       if (t > 1) t = 1;
       const e = easeInOut(t);
-      PARAMS.forEach((p) => { state[p] = from[p] + (OPT[p] - from[p]) * e; });
+      PARAMS.forEach((p) => { state[p] = from[p] + (dest[p] - from[p]) * e; });
       syncSliders();
       refresh();
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
         animating = false;
-        optBtn.classList.remove("running");
-        optBtn.textContent = "AI Optimize";
-        optBtn.disabled = false;
         PARAMS.forEach((p) => sliderEls[p].wrap.classList.remove("active"));
+        if (onDone) onDone();
       }
     }
     requestAnimationFrame(step);
   }
+
+  function runOptimize() {
+    if (animating) return;
+    clearPresetSelection();
+    optBtn.classList.add("running");
+    optBtn.textContent = "Optimizing…";
+    optBtn.disabled = true;
+    animateTo(OPT, () => {
+      optBtn.classList.remove("running");
+      optBtn.textContent = "AI Optimize";
+      optBtn.disabled = false;
+    });
+  }
   optBtn.addEventListener("click", runOptimize);
 
-  document.getElementById("reset").addEventListener("click", () => {
-    if (animating) return;
-    PARAMS.forEach((p) => { const [lo, hi] = RANGES[p]; state[p] = (lo + hi) / 2; });
-    syncSliders();
-    PARAMS.forEach((p) => sliderEls[p].wrap.classList.remove("active"));
-    refresh();
+  // ======================================================================
+  //  Preset designs
+  // ======================================================================
+  const presetBtns = Array.prototype.slice.call(
+    document.querySelectorAll(".chip[data-preset]")
+  );
+  function clearPresetSelection() {
+    presetBtns.forEach((b) => b.classList.remove("sel"));
+  }
+  presetBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (animating) return;
+      const dest = PRESETS[btn.dataset.preset];
+      if (!dest) return;
+      clearPresetSelection();
+      btn.classList.add("sel");
+      animateTo(dest);
+    });
+  });
+
+  // ======================================================================
+  //  Export — copy the current design + predictions to the clipboard
+  // ======================================================================
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        ok ? resolve() : reject(new Error("copy command failed"));
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function flash(btn, msg) {
+    if (!btn._label) btn._label = btn.textContent;
+    btn.textContent = msg;
+    btn.classList.add("ok");
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => {
+      btn.textContent = btn._label;
+      btn.classList.remove("ok");
+    }, 1500);
+  }
+
+  function buildExport() {
+    const y = predict();
+    const design = {};
+    PARAMS.forEach((p) => { design[p] = +state[p].toFixed(4); });
+    return {
+      tool: "Yagi Surrogate Playground",
+      note: "Surrogate prediction — verify with NEC2 before building.",
+      units: "lengths & spacings in wavelengths (λ); gain dBi; F/B dB; impedance Ω",
+      design_lambda: design,
+      predicted: {
+        forward_gain_dBi: +y.G_fwd.toFixed(2),
+        front_to_back_dB: +y.FB.toFixed(2),
+        feed_R_ohm: +y.R.toFixed(2),
+        feed_X_ohm: +y.X.toFixed(2),
+      },
+      source: "github.com/1ove9/antenna-forge",
+    };
+  }
+
+  document.getElementById("export").addEventListener("click", function () {
+    firstInteraction();
+    const json = JSON.stringify(buildExport(), null, 2);
+    copyText(json).then(
+      () => flash(this, "Copied"),
+      () => flash(this, "Copy failed")
+    );
+  });
+
+  // ======================================================================
+  //  Share — encode the design into the URL and copy a shareable link
+  // ======================================================================
+  function shareURL() {
+    const loc = window.location;
+    const q = PARAMS.map((p) => p + "=" + state[p].toFixed(4)).join("&");
+    return loc.origin + loc.pathname + "?" + q;
+  }
+
+  document.getElementById("share").addEventListener("click", function () {
+    firstInteraction();
+    const url = shareURL();
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", url);
+    }
+    copyText(url).then(
+      () => flash(this, "Link copied"),
+      () => flash(this, "Copy failed")
+    );
   });
 
   // ======================================================================
@@ -6889,6 +7161,7 @@
   // ---- boot ----
   refresh();
   TARGETS.forEach((t) => { shown[t] = target[t]; });
+  optBtn.classList.add("hinting");
   loop();
 })();
 </script>
