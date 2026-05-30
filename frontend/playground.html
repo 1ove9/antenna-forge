@@ -226,6 +226,12 @@
     color: var(--txt-dim);
     font-weight: 400;
   }
+  .readout .name .sub {
+    font-size: 0.72em;
+    letter-spacing: 0.02em;
+    vertical-align: -0.18em;
+    margin-left: 0.5px;
+  }
   .readout .name .full {
     display: block;
     margin-top: 4px;
@@ -6538,7 +6544,15 @@
     s_ref: "s · ref→drv", s_d1: "s · drv→d1",
     s_d2: "s · d1→d2", s_d3: "s · d2→d3",
   };
-  const READOUT_FULL = { G_fwd: "forward gain", FB: "front / back", R: "resistance", X: "reactance" };
+  const READOUT_FULL = { G_fwd: "forward gain", FB: "front-to-back", R: "feed resistance", X: "feed reactance" };
+  // RF-conventional symbol shown large; spelled-out title on hover.
+  const READOUT_SYM = { G_fwd: "G<span class=\"sub\">fwd</span>", FB: "F/B", R: "R", X: "X" };
+  const READOUT_TITLE = {
+    G_fwd: "Forward gain — dBi (gain over an isotropic radiator)",
+    FB: "Front-to-back ratio — dB (forward lobe relative to the 180° back lobe)",
+    R: "Feed-point resistance — Ω (real part of the driven-element input impedance)",
+    X: "Feed-point reactance — Ω (imaginary part; + inductive, − capacitive)",
+  };
 
   // ---- state -------------------------------------------------------------
   const state = {};   // current param values (physical units, λ)
@@ -6581,8 +6595,9 @@
     TARGETS.forEach((t, i) => {
       const el = document.createElement("div");
       el.className = "readout";
+      el.setAttribute("title", READOUT_TITLE[t]);
       el.innerHTML =
-        '<div class="name">' + t.replace("_", "&thinsp;") +
+        '<div class="name">' + READOUT_SYM[t] +
         '<span class="full">' + READOUT_FULL[t] + "</span></div>" +
         '<div class="val"><span class="n">—</span>' +
         '<span class="unit">' + UNITS[i] + "</span></div>";
