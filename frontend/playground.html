@@ -6583,11 +6583,16 @@
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    // Fog tinted to the inner-panel colour so the (large) ground plane fades
+    // smoothly into the background instead of ending on a hard black edge.
+    // near is past the array so the elements stay crisp.
+    scene.fog = new THREE.Fog(0x10151c, 15, 60);
     const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
     // three-quarter product-shot framing: looking down ~28° from above and
     // offset to the side so the boom recedes with perspective and the array
     // reads as a 3D structure rather than a flat comb of vertical lines.
     camera.position.set(5.6, 5.0, 7.4);
+    camera.up.set(0, 1, 0);   // keep world-up vertical so the boom reads level
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -6597,7 +6602,8 @@
     controls.maxDistance = 18;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.42;
-    controls.target.set(0, 0, 0);
+    // orbit around the grounded array's mid-height (it now sits on the floor)
+    controls.target.set(0, -0.5, 0);
 
     // Neutral gradient environment — gives the metal something to reflect so
     // the polished silver actually reads as metal (bright top, dark
@@ -6704,7 +6710,7 @@
     const floorMat = new THREE.MeshStandardMaterial({
       color: FLOOR_COLOR, metalness: 0.0, roughness: 0.95,
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 34), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -2.3;
     floor.receiveShadow = true;
@@ -6719,15 +6725,23 @@
       z.push(z[3] + s.s_d3);
       const zMean = z.reduce((a, b) => a + b, 0) / z.length;
 
+      // Drop the array onto the floor: pick a common element centre height so
+      // the longest element's foot just clears the floor. All elements (and
+      // the boom) share this centre, so the boom stays a straight, level beam
+      // through their middles and every element's base nearly touches the
+      // ground — its short shadow then reads as attached to its foot.
+      const lens = elements.map((e) => s[e.Lp] * SCALE);
+      const maxLen = Math.max(...lens);
+      const baseY = floor.position.y + 0.01 + maxLen / 2;
+
       elements.forEach((e, i) => {
-        const len = s[e.Lp] * SCALE;
-        e.mesh.scale.set(1, len, 1);   // cylinder default height 1 → length
-        e.mesh.position.set(0, 0, (z[i] - zMean) * SCALE);
+        e.mesh.scale.set(1, lens[i], 1);   // cylinder default height 1 → length
+        e.mesh.position.set(0, baseY, (z[i] - zMean) * SCALE);
       });
 
       const span = (z[z.length - 1] - z[0]) * SCALE;
       boom.scale.set(1, span + 0.4, 1);
-      boom.position.set(0, 0, 0);
+      boom.position.set(0, baseY, 0);
     }
 
     function resize() {
